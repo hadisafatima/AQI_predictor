@@ -1,7 +1,9 @@
 import requests
 import pandas as pd
+import os
 
-API_Key = '702588677ff8c18baa589c5dcbfe36c5'
+# API_Key = '702588677ff8c18baa589c5dcbfe36c5'
+API_Key = os.getenv("OPENWEATHER_API_KEY")
 city_name = 'Matiari'
 
 # -----------------------------
@@ -129,3 +131,6 @@ df.to_csv("aqi_weather_dataset.csv", index=False)
 
 print("Dataset created successfully!")
 print(df.head())
+
+
+# print('API_KEY:', API_Key)

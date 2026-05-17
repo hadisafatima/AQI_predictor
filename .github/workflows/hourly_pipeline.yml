@@ -69,8 +69,9 @@ jobs:
       - name: Run script
         env:
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: |
-          python src/fetch_data.py
+          python scripts/historical_fetch.py
 
       - name: Commit updated dataset
         run: |
