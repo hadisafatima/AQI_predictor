@@ -1,39 +1,81 @@
-name: Hourly AQI Pipeline
+# name: Hourly AQI Pipeline
+
+# on:
+#   schedule:
+#     - cron: '0 * * * *'
+
+#   workflow_dispatch:
+
+# jobs:
+#   fetch-data:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.11'
+
+#       - name: Install dependencies
+#         run: |
+#           pip install -r requirements.txt
+
+#       - name: Run pipeline
+#         env:
+#             OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+#             MONGODB_URI: ${{ secrets.MONGODB_URI }}
+#         run: |
+#           python scripts/hourly_fetch.py
+
+#       - name: Commit updated CSV
+#         run: |
+#           git config --global user.name 'github-actions'
+#           git config --global user.email 'actions@github.com'
+#           git add .
+#           git commit -m 'Hourly dataset update' || echo 'No changes'
+#           git push
+
+
+
+
+name: Hourly AQI Data Fetch
 
 on:
   schedule:
-    - cron: '0 * * * *'
-
-  workflow_dispatch:
+    - cron: "0 * * * *"   # every hour
+  workflow_dispatch:       # manual run button
 
 jobs:
-  fetch-data:
+  run-script:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run pipeline
+      - name: Run script
         env:
-            OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
-            MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
         run: |
-          python scripts/hourly_fetch.py
+          python src/fetch_data.py
 
-      - name: Commit updated CSV
+      - name: Commit updated dataset
         run: |
-          git config --global user.name 'github-actions'
-          git config --global user.email 'actions@github.com'
-          git add .
-          git commit -m 'Hourly dataset update' || echo 'No changes'
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add aqi_weather_dataset.csv
+          git commit -m "Hourly AQI update" || echo "No changes to commit"
           git push
