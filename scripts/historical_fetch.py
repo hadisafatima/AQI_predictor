@@ -95,7 +95,12 @@ API_KEY = os.getenv("OPENWEATHER_API_KEY")
 MONGODB_URI = os.getenv("MONGODB_URI")
 
 # MongoDB connection
-client = MongoClient(MONGODB_URI)
+# client = MongoClient(MONGODB_URI)
+client = MongoClient(
+    MONGODB_URI,
+    tls=True,
+    tlsAllowInvalidCertificates=True
+)
 db = client["aqi_db"]
 collection = db["weather_data"]
 
