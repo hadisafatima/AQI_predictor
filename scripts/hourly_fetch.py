@@ -161,7 +161,7 @@ document = {
 # -----------------------------
 # INSERT INTO MONGODB
 # -----------------------------
-# collection.insert_one(document)
+collection.insert_one(document)
 
 # -----------------------------
 # LOGS
