@@ -1,7 +1,9 @@
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from pymongo import MongoClient
+from dotenv import load_dotenv
+load_dotenv()
 
 API_KEY = os.getenv("OPENWEATHER_API_KEY")
 MONGODB_URI = os.getenv("MONGODB_URI")
@@ -21,7 +23,7 @@ LON = 68.4467
 CITY = "Matiari"
 
 # CURRENT TIME ONLY
-current_time = datetime.utcnow()
+current_time = datetime.now(timezone.utc)
 
 timestamp = int(current_time.timestamp())
 
@@ -47,7 +49,7 @@ weather_current = weather_data
 
 # AQI API (current air pollution)
 aqi_url = (
-    f"http://api.openweathermap.org/data/2.5/air_pollution"
+    f"https://api.openweathermap.org/data/2.5/air_pollution"
     f"?lat={LAT}&lon={LON}&appid={API_KEY}"
 )
 
@@ -123,6 +125,7 @@ document = {
     "nh3": aqi_data["components"]["nh3"],
 }
 
+# print(document['temp'])
 
 # print(document)
 # INSERT INTO MONGODB
@@ -131,3 +134,5 @@ collection.insert_one(document)
 print(f"Inserted current hour data: {current_time}")
 
 print("Mongo URI exists:", bool(MONGODB_URI))
+
+# print('API Key:', API_KEY)
