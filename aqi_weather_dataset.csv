@@ -1,2 +1,0 @@
-city,datetime,hour,day,month,day_of_week,lat,lon,temp,feels_like,humidity,pressure,wind_speed,wind_deg,clouds,weather_main,weather_description,aqi,pm2_5,pm10,co,no2,o3,so2,nh3,aqi_change_rate
-Matiari,2026-05-17 10:37:41,10,17,5,6,25.5961,68.4467,42.31,39.58,11,1001,8.67,238,0,Clear,clear sky,3,22.77,72.93,142.1,1.58,104.34,8.34,0.71,0.0
