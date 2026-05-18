@@ -1,134 +1,12 @@
-# import requests
-# from datetime import datetime
-# import os
-# from pymongo import MongoClient
-
-# API_KEY = os.getenv("OPENWEATHER_API_KEY")
-# MONGODB_URI = os.getenv("MONGODB_URI")
-
-# client = MongoClient(MONGODB_URI)
-# db = client["aqi_db"]
-# collection = db["weather_data"]
-
-# LAT = 25.5961
-# LON = 68.4467
-# CITY = "Matiari"
-
-# # -----------------------------
-# # 1. WEATHER API (OpenWeather)
-# # -----------------------------
-# weather_url = (
-#     f"https://api.openweathermap.org/data/2.5/weather"
-#     f"?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
-# )
-
-# weather_response = requests.get(weather_url)
-
-# if weather_response.status_code != 200:
-#     print("Weather API failed")
-#     print(weather_response.text)
-#     exit()
-
-# weather = weather_response.json()
-
-# # -----------------------------
-# # 2. AQI API (OpenAQ)
-# # -----------------------------
-# aqi_url = "https://api.openaq.org/v2/latest"
-
-# aqi_response = requests.get(aqi_url, params={
-#     "coordinates": f"{LAT},{LON}",
-#     "radius": 5000,
-#     "limit": 1
-# })
-
-# if aqi_response.status_code != 200:
-#     print("AQI API failed")
-#     print(aqi_response.text)
-#     exit()
-
-# aqi_results = aqi_response.json()["results"]
-
-# # default pollutant values
-# pm2_5 = pm10 = no2 = o3 = co = so2 = nh3 = None
-
-# if aqi_results:
-#     measurements = aqi_results[0]["measurements"]
-
-#     for m in measurements:
-#         if m["parameter"] == "pm25":
-#             pm2_5 = m["value"]
-#         elif m["parameter"] == "pm10":
-#             pm10 = m["value"]
-#         elif m["parameter"] == "no2":
-#             no2 = m["value"]
-#         elif m["parameter"] == "o3":
-#             o3 = m["value"]
-#         elif m["parameter"] == "co":
-#             co = m["value"]
-#         elif m["parameter"] == "so2":
-#             so2 = m["value"]
-#         elif m["parameter"] == "nh3":
-#             nh3 = m["value"]
-
-# # -----------------------------
-# # 3. MERGED DOCUMENT
-# # -----------------------------
-# current_time = datetime.utcnow()
-
-# document = {
-#     "city": CITY,
-#     "lat": LAT,
-#     "lon": LON,
-#     "datetime": current_time,
-
-#     # time features
-#     "year": current_time.year,
-#     "month": current_time.month,
-#     "day": current_time.day,
-#     "hour": current_time.hour,
-#     "day_of_week": current_time.strftime("%A"),
-
-#     # WEATHER (OpenWeather)
-#     "temp": weather["main"]["temp"],
-#     "feels_like": weather["main"]["feels_like"],
-#     "humidity": weather["main"]["humidity"],
-#     "pressure": weather["main"]["pressure"],
-#     "wind_speed": weather["wind"]["speed"],
-#     "wind_deg": weather["wind"]["deg"],
-#     "clouds": weather["clouds"]["all"],
-
-#     # AQI (OpenAQ)
-#     "pm2_5": pm2_5,
-#     "pm10": pm10,
-#     "no2": no2,
-#     "o3": o3,
-#     "co": co,
-#     "so2": so2,
-#     "nh3": nh3
-# }
-
-# # -----------------------------
-# # 4. SAVE TO MONGODB
-# # -----------------------------
-# collection.insert_one(document)
-
-# print(f"Inserted merged weather + AQI data for {current_time}")
-
-
-
-
 import requests
 from datetime import datetime
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 
-# LOAD ENV FILE (THIS WAS MISSING)
 load_dotenv()
 
 MONGODB_URI = os.getenv("MONGODB_URI")
-OPENAQ_API_KEY = os.getenv("OPENAQ_API_KEY")
 
 client = MongoClient(MONGODB_URI)
 db = client["aqi_db"]
@@ -139,7 +17,7 @@ LON = 68.4467
 CITY = "Matiari"
 
 # ---------------- WEATHER (Open-Meteo)
-url = (
+weather_url = (
     "https://archive-api.open-meteo.com/v1/archive"
     f"?latitude={LAT}&longitude={LON}"
     "&start_date=2026-04-01"
@@ -149,41 +27,26 @@ url = (
     "&timezone=auto"
 )
 
-weather = requests.get(url).json()["hourly"]
+weather = requests.get(weather_url).json()["hourly"]
 print("Weather fetched ✔")
-# print(weather)
 
-# ---------------- AQI (OpenAQ v3)
-# aqi_url = "https://api.openaq.org/v3/locations"
+# ---------------- AQI (Open-Meteo Air Quality)
+aqi_url = (
+    "https://air-quality-api.open-meteo.com/v1/air-quality"
+    f"?latitude={LAT}&longitude={LON}"
+    "&start_date=2026-04-01"
+    "&end_date=2026-05-17"
+    "&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone,sulphur_dioxide"
+    "&timezone=auto"
+)
 
-# headers = {
-#     "X-API-Key": os.getenv("OPENAQ_API_KEY")
-# }
+aqi = requests.get(aqi_url).json()["hourly"]
+print("AQI fetched ✔")
 
-# params = {
-#     "coordinates": f"{LAT},{LON}",
-#     "radius": 25000,   # increase radius for Pakistan coverage
-#     "limit": 1
-# }
-
-# resp = requests.get(aqi_url, headers=headers, params=params)
-
-# print("AQI status:", resp.status_code)
-
-# data = resp.json()
-# print(data)
-
-# aqi = requests.get(aqi_url, params=params).json()["results"]
-
-# print("AQI fetched ✔")
-
-from datetime import datetime
-
+# ---------------- BUILD WEATHER MAP
 weather_map = {}
 
-for i in range(len(weather["time"])):
-    dt = weather["time"][i]
-
+for i, dt in enumerate(weather["time"]):
     weather_map[dt] = {
         "temp": weather["temperature_2m"][i],
         "humidity": weather["relative_humidity_2m"][i],
@@ -193,51 +56,86 @@ for i in range(len(weather["time"])):
         "clouds": weather["cloud_cover"][i],
     }
 
+# ---------------- BUILD AQI MAP
+aqi_map = {}
 
-# from collections import defaultdict
+for i, dt in enumerate(aqi["time"]):
+    aqi_map[dt] = {
+        "pm10": aqi["pm10"][i],
+        "pm25": aqi["pm2_5"][i],
+        "co": aqi["carbon_monoxide"][i],
+        "no2": aqi["nitrogen_dioxide"][i],
+        "o3": aqi["ozone"][i],
+        "so2": aqi["sulphur_dioxide"][i],
+    }
 
-# aqi_map = defaultdict(dict)
+# ---------------- AQI INDEX FUNCTION
+def compute_aqi(p):
+    values = [
+        p.get("pm25"),
+        p.get("pm10"),
+        p.get("no2"),
+        p.get("o3"),
+        p.get("co"),
+        p.get("so2"),
+    ]
+    values = [v for v in values if v is not None]
+    return max(values) if values else None
 
-# for item in aqi:
-#     dt = item["date"]["utc"][:13]  # hour bucket
+# ---------------- SORT TIME KEYS
+all_times = sorted(set(weather_map.keys()) & set(aqi_map.keys()))
 
-#     param = item["parameter"]
-#     val = item["value"]
+prev_aqi = None
 
-#     aqi_map[dt][param] = val
+# ---------------- MERGE & INSERT
+for dt in all_times:
 
+    w = weather_map.get(dt, {})
+    a = aqi_map.get(dt, {})
 
-for dt in weather_map:
+    aqi_index = compute_aqi(a)
 
-    w = weather_map[dt]
-    # a = aqi_map.get(dt, {})
+    # AQI change rate (trend feature)
+    if prev_aqi is None or aqi_index is None:
+        aqi_change = None
+    else:
+        aqi_change = aqi_index - prev_aqi
+
+    prev_aqi = aqi_index
+
+    dt_obj = datetime.fromisoformat(dt)
 
     doc = {
         "city": CITY,
         "datetime": dt,
 
-        # TIME FEATURES
-        "hour": dt.split("T")[1][:2],
-        "day": dt.split("T")[0],
-        "month": dt.split("T")[0].split("-")[1],
+        "hour": dt_obj.hour,
+        "day": dt_obj.day,
+        "month": dt_obj.month,
+        "year": dt_obj.year,
+        "day_of_week": dt_obj.strftime("%A"),
 
         # WEATHER
-        "temp": w["temp"],
-        "humidity": w["humidity"],
-        "pressure": w["pressure"],
-        "wind_speed": w["wind_speed"],
-        "wind_deg": w["wind_deg"],
-        "clouds": w["clouds"],
+        "temp": w.get("temp"),
+        "humidity": w.get("humidity"),
+        "pressure": w.get("pressure"),
+        "wind_speed": w.get("wind_speed"),
+        "wind_deg": w.get("wind_deg"),
+        "clouds": w.get("clouds"),
 
-        # AQI
-        # "pm25": a.get("pm25"),
-        # "pm10": a.get("pm10"),
-        # "no2": a.get("no2"),
-        # "o3": a.get("o3"),
-        # "so2": a.get("so2"),
-        # "co": a.get("co"),
+        # AQI COMPONENTS
+        "pm25": a.get("pm25"),
+        "pm10": a.get("pm10"),
+        "no2": a.get("no2"),
+        "o3": a.get("o3"),
+        "so2": a.get("so2"),
+        "co": a.get("co"),
+
+        # 🔥 DERIVED FEATURES
+        "aqi_index": aqi_index,
+        "aqi_change_rate": aqi_change
     }
 
     collection.insert_one(doc)
 
-print("✔ Full historical dataset stored")
+print("✔ Full historical dataset stored successfully")

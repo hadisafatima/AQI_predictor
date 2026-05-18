@@ -88,23 +88,23 @@ aqi_data = aqi_response.json()["list"][0]
 
 document = {
     "city": CITY,
-    "lat": LAT,
-    "lon": LON,
+    # "lat": LAT,
+    # "lon": LON,
 
     # Full timestamp
     "datetime": current_time,
 
     # Useful ML time features
-    "year": current_time.year,
-    "month": current_time.month,
-    "day": current_time.day,
     "hour": current_time.hour,
+    "day": current_time.day,
+    "month": current_time.month,
+    "year": current_time.year,
     # "minute": current_time.minute,
     "day_of_week": current_time.strftime("%A"),
 
     # Weather data
     "temp": weather_current["main"]["temp"],
-    "feels_like": weather_current["main"]["feels_like"],
+    # "feels_like": weather_current["main"]["feels_like"],
     "humidity": weather_current["main"]["humidity"],
     "pressure": weather_current["main"]["pressure"],
 
@@ -114,15 +114,16 @@ document = {
     "clouds": weather_current["clouds"]["all"],
 
     # AQI data
-    "aqi": aqi_data["main"]["aqi"],
 
-    "pm2_5": aqi_data["components"]["pm2_5"],
+    "pm25": aqi_data["components"]["pm2_5"],
     "pm10": aqi_data["components"]["pm10"],
-    "co": aqi_data["components"]["co"],
     "no2": aqi_data["components"]["no2"],
     "o3": aqi_data["components"]["o3"],
     "so2": aqi_data["components"]["so2"],
-    "nh3": aqi_data["components"]["nh3"],
+    # "nh3": aqi_data["components"]["nh3"],
+    "co": aqi_data["components"]["co"],
+    
+    "aqi_index": aqi_data["main"]["aqi"],
 }
 
 # print(document['temp'])
