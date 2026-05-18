@@ -128,8 +128,6 @@ if latest_doc:
 # -----------------------------
 document = {
     "city": CITY,
-
-    # DATETIME
     "datetime": current_time,
 
     # TIME FEATURES
@@ -139,25 +137,15 @@ document = {
     "year": current_time.year,
     "day_of_week": current_time.strftime("%A"),
 
-    # LOCATION
-    "lat": LAT,
-    "lon": LON,
-
-    # WEATHER DATA
+    # WEATHER 
     "temp": weather_data["main"]["temp"],
-    "feels_like": weather_data["main"]["feels_like"],
     "humidity": weather_data["main"]["humidity"],
     "pressure": weather_data["main"]["pressure"],
-
     "wind_speed": weather_data["wind"]["speed"],
     "wind_deg": weather_data["wind"]["deg"],
-
     "clouds": weather_data["clouds"]["all"],
 
-    "weather_main": weather_data["weather"][0]["main"],
-    "weather_description": weather_data["weather"][0]["description"],
-
-    # POLLUTANTS
+    # AQI COMPONENTS
     "pm25": pollutants["pm25"],
     "pm10": pollutants["pm10"],
     "no2": pollutants["no2"],
@@ -165,7 +153,7 @@ document = {
     "so2": pollutants["so2"],
     "co": pollutants["co"],
 
-    # ENGINEERED FEATURES
+    # DERIVED FEATURES
     "aqi_index": current_aqi,
     "aqi_change_rate": aqi_change_rate
 }
@@ -173,7 +161,7 @@ document = {
 # -----------------------------
 # INSERT INTO MONGODB
 # -----------------------------
-collection.insert_one(document)
+# collection.insert_one(document)
 
 # -----------------------------
 # LOGS
@@ -181,4 +169,5 @@ collection.insert_one(document)
 print("Inserted document successfully ✔")
 print(document)
 print(f"AQI Change Rate: {aqi_change_rate}")
+print('previous_aqi:', previous_aqi)
 print("Mongo URI exists:", bool(MONGODB_URI))

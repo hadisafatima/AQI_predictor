@@ -109,6 +109,7 @@ for dt in all_times:
         "city": CITY,
         "datetime": dt,
 
+        # TIME FEATURES
         "hour": dt_obj.hour,
         "day": dt_obj.day,
         "month": dt_obj.month,
@@ -131,7 +132,7 @@ for dt in all_times:
         "so2": a.get("so2"),
         "co": a.get("co"),
 
-        # 🔥 DERIVED FEATURES
+        # DERIVED FEATURES
         "aqi_index": aqi_index,
         "aqi_change_rate": aqi_change
     }
