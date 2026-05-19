@@ -1,4 +1,26 @@
+# Data Handling
 requests
 pymongo
 dnspython
 python-dotenv
+
+# ML models
+scikit-learn
+scipy
+
+# Boosting models
+xgboost
+lightgbm
+
+# Deep learning (choose one approach)
+tensorflow
+
+# Time series models
+statsmodels
+
+# Utilities
+joblib
+
+# Visualization (optional but recommended)
+matplotlib
+seaborn

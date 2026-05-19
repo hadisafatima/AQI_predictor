@@ -1,0 +1,5 @@
+| Category      | Models                         |
+| ------------- | ------------------------------ |
+| Statistical   | ARIMA, SARIMA, Holt-Winters    |
+| ML Models     | RF, XGBoost, Linear Regression |
+| Deep Learning | LSTM, GRU                      |
