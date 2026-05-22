@@ -24,3 +24,9 @@ joblib
 # Visualization (optional but recommended)
 matplotlib
 seaborn
+
+#streamlit App
+streamlit
+plotly
+shap
+streamlit-autorefresh

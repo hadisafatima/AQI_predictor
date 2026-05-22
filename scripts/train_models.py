@@ -54,6 +54,9 @@ df["aqi_roll_24"] = df["aqi_index"].rolling(24).mean()
 
 df = df.dropna()
 
+# Save snapshot BEFORE target shift removes the last row — used as forecast seed
+df_latest = df.copy()
+
 
 # =========================
 # 3. TARGET (NEXT HOUR AQI)
@@ -170,7 +173,7 @@ print("R2:", results[best_model_name][3])
 
 def forecast_72_hours(model, df, features):
 
-    df_copy = df.copy()
+    df_copy = df.copy().reset_index(drop=True)
     predictions = []
 
     for i in range(72):  # 24h × 3 days
@@ -186,16 +189,25 @@ def forecast_72_hours(model, df, features):
 
         new_row["aqi_index"] = pred
 
-        # shift lags
+        # shift short lags
         new_row["aqi_lag3"] = latest["aqi_lag2"]
         new_row["aqi_lag2"] = latest["aqi_lag1"]
         new_row["aqi_lag1"] = latest["aqi_index"]
-        new_row["aqi_lag24"] = latest["aqi_lag1"]
+
+        # aqi_lag24: carry latest["aqi_lag24"] for first 24 steps (no predicted history yet),
+        # then look back 24 rows into the growing df_copy
+        if i < 24:
+            new_row["aqi_lag24"] = latest["aqi_lag24"]
+        else:
+            new_row["aqi_lag24"] = df_copy.iloc[-24]["aqi_index"]
 
         # rolling updates
-        new_row["aqi_roll_3"] = np.mean(predictions[-3:])
-        new_row["aqi_roll_6"] = np.mean(predictions[-6:])
+        new_row["aqi_roll_3"]  = np.mean(predictions[-3:])
+        new_row["aqi_roll_6"]  = np.mean(predictions[-6:])
         new_row["aqi_roll_24"] = np.mean(predictions[-24:]) if len(predictions) >= 24 else np.mean(predictions)
+
+        # aqi_diff = change from previous step
+        new_row["aqi_diff"] = pred - latest["aqi_index"]
 
         new_row["datetime"] = latest["datetime"] + timedelta(hours=1)
 
@@ -204,7 +216,7 @@ def forecast_72_hours(model, df, features):
     return predictions
 
 
-future_72h = forecast_72_hours(best_model, df, features)
+future_72h = forecast_72_hours(best_model, df_latest, features)
 
 
 # =========================
@@ -212,7 +224,6 @@ future_72h = forecast_72_hours(best_model, df, features)
 # =========================
 
 future_hours = pd.DataFrame({
-    # "hour": range(1, 73),
     "predicted_aqi": np.round(future_72h, 3)
 })
 
