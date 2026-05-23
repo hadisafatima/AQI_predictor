@@ -4,17 +4,13 @@ import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
-# -----------------------------
 # LOAD ENV VARIABLES
-# -----------------------------
 load_dotenv()
 
 API_KEY = os.getenv("OPENWEATHER_API_KEY")
 MONGODB_URI = os.getenv("MONGODB_URI")
 
-# -----------------------------
 # MONGODB CONNECTION
-# -----------------------------
 client = MongoClient(
     MONGODB_URI,
     tls=True,
@@ -24,21 +20,15 @@ client = MongoClient(
 db = client["aqi_db"]
 collection = db["weather_data"]
 
-# -----------------------------
 # LOCATION
-# -----------------------------
 LAT = 25.5961
 LON = 68.4467
 CITY = "Matiari"
 
-# -----------------------------
 # CURRENT UTC TIME
-# -----------------------------
 current_time = datetime.now(timezone.utc)
 
-# -----------------------------
 # WEATHER API
-# -----------------------------
 weather_url = (
     f"https://api.openweathermap.org/data/2.5/weather"
     f"?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric"
@@ -54,9 +44,7 @@ if weather_response.status_code != 200:
 
 weather_data = weather_response.json()
 
-# -----------------------------
 # AQI API
-# -----------------------------
 aqi_url = (
     f"https://api.openweathermap.org/data/2.5/air_pollution"
     f"?lat={LAT}&lon={LON}&appid={API_KEY}"
@@ -72,9 +60,7 @@ if aqi_response.status_code != 200:
 
 aqi_data = aqi_response.json()["list"][0]
 
-# -----------------------------
 # POLLUTANT DATA
-# -----------------------------
 pollutants = {
     "pm25": aqi_data["components"]["pm2_5"],
     "pm10": aqi_data["components"]["pm10"],
@@ -84,9 +70,7 @@ pollutants = {
     "co": aqi_data["components"]["co"],
 }
 
-# -----------------------------
 # CUSTOM AQI COMPUTATION
-# -----------------------------
 def compute_aqi(p):
     values = [
         p.get("pm25"),
@@ -104,9 +88,7 @@ def compute_aqi(p):
 # CURRENT COMPUTED AQI
 current_aqi = compute_aqi(pollutants)
 
-# -----------------------------
 # GET PREVIOUS AQI
-# -----------------------------
 latest_doc = collection.find_one(
     {"city": CITY},
     sort=[("datetime", -1)]
@@ -123,9 +105,7 @@ if latest_doc:
     if isinstance(previous_aqi, (int, float)):
         aqi_change_rate = round(current_aqi - previous_aqi, 2)
 
-# -----------------------------
 # FINAL DOCUMENT
-# -----------------------------
 document = {
     "city": CITY,
     "datetime": current_time,
@@ -158,14 +138,10 @@ document = {
     "aqi_change_rate": aqi_change_rate
 }
 
-# -----------------------------
 # INSERT INTO MONGODB
-# -----------------------------
 collection.insert_one(document)
 
-# -----------------------------
 # LOGS
-# -----------------------------
 print("Inserted document successfully ✔")
 print(document)
 print(f"AQI Change Rate: {aqi_change_rate}")

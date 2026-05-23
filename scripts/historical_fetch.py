@@ -16,7 +16,7 @@ LAT = 25.5961
 LON = 68.4467
 CITY = "Matiari"
 
-# ---------------- WEATHER (Open-Meteo)
+#  WEATHER (Open-Meteo)
 weather_url = (
     "https://archive-api.open-meteo.com/v1/archive"
     f"?latitude={LAT}&longitude={LON}"
@@ -30,7 +30,7 @@ weather_url = (
 weather = requests.get(weather_url).json()["hourly"]
 print("Weather fetched ✔")
 
-# ---------------- AQI (Open-Meteo Air Quality)
+# AQI (Open-Meteo Air Quality)
 aqi_url = (
     "https://air-quality-api.open-meteo.com/v1/air-quality"
     f"?latitude={LAT}&longitude={LON}"
@@ -43,7 +43,7 @@ aqi_url = (
 aqi = requests.get(aqi_url).json()["hourly"]
 print("AQI fetched ✔")
 
-# ---------------- BUILD WEATHER MAP
+# WEATHER MAP
 weather_map = {}
 
 for i, dt in enumerate(weather["time"]):
@@ -56,7 +56,7 @@ for i, dt in enumerate(weather["time"]):
         "clouds": weather["cloud_cover"][i],
     }
 
-# ---------------- BUILD AQI MAP
+# AQI MAP
 aqi_map = {}
 
 for i, dt in enumerate(aqi["time"]):
@@ -69,7 +69,7 @@ for i, dt in enumerate(aqi["time"]):
         "so2": aqi["sulphur_dioxide"][i],
     }
 
-# ---------------- AQI INDEX FUNCTION
+# AQI INDEX FUNCTION
 def compute_aqi(p):
     values = [
         p.get("pm25"),
@@ -82,12 +82,12 @@ def compute_aqi(p):
     values = [v for v in values if v is not None]
     return max(values) if values else None
 
-# ---------------- SORT TIME KEYS
+# SORT TIME KEYS
 all_times = sorted(set(weather_map.keys()) & set(aqi_map.keys()))
 
 prev_aqi = None
 
-# ---------------- MERGE & INSERT
+# MERGE & INSERT
 for dt in all_times:
 
     w = weather_map.get(dt, {})

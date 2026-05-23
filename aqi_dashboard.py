@@ -8,16 +8,14 @@ from plotly.subplots import make_subplots
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 from math import sqrt
-import warnings
-warnings.filterwarnings("ignore")
-
-# ── ML ──────────────────────────────────────────────────────────────────────
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 import shap
+import warnings
+warnings.filterwarnings("ignore")
 
 # PAGE CONFIG
 st.set_page_config(

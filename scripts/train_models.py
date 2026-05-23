@@ -3,21 +3,15 @@ import numpy as np
 import pandas as pd
 from pymongo import MongoClient
 from datetime import datetime, timedelta
-
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 import joblib
-
 from math import sqrt
 
-
-# =========================
-# 1. LOAD DATA (HOURLY)
-# =========================
-
+# LOAD DATA (HOURLY)
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
 
@@ -35,13 +29,10 @@ df = df.sort_values("datetime")
 print("Raw data shape:", df.shape)
 
 
-# =========================
-# 2. FEATURE ENGINEERING (HOURLY)
-# =========================
-
+# FEATURE ENGINEERING (HOURLY)
 df["aqi_diff"] = df["aqi_index"].diff()
 
-# lag features (VERY IMPORTANT)
+# lag features 
 df["aqi_lag1"] = df["aqi_index"].shift(1)
 df["aqi_lag2"] = df["aqi_index"].shift(2)
 df["aqi_lag3"] = df["aqi_index"].shift(3)
@@ -58,18 +49,12 @@ df = df.dropna()
 df_latest = df.copy()
 
 
-# =========================
-# 3. TARGET (NEXT HOUR AQI)
-# =========================
-
+# TARGET (NEXT HOUR AQI)
 df["target"] = df["aqi_index"].shift(-1)
 df = df.dropna()
 
 
-# =========================
-# 4. FEATURES
-# =========================
-
+# FEATURES
 features = [
     "temp",
     "humidity",
@@ -94,10 +79,7 @@ X = df[features]
 y = df["target"]
 
 
-# =========================
-# 5. TRAIN TEST SPLIT (TIME ORDERED)
-# =========================
-
+# TRAIN TEST SPLIT (TIME ORDERED)
 split = int(len(df) * 0.8)
 
 X_train, X_test = X.iloc[:split], X.iloc[split:]
@@ -106,10 +88,7 @@ y_train, y_test = y.iloc[:split], y.iloc[split:]
 results = {}
 
 
-# =========================
-# 6. MODELS
-# =========================
-
+# MODELS
 models = {
     "LinearRegression": LinearRegression(),
 
@@ -135,10 +114,7 @@ models = {
 }
 
 
-# =========================
-# 7. TRAIN + COMPARE MODELS
-# =========================
-
+# TRAIN + COMPARE MODELS
 for name, model in models.items():
 
     model.fit(X_train, y_train)
@@ -156,10 +132,7 @@ for name, model in models.items():
     print(f"R2  : {r2:.3f}")
 
 
-# =========================
-# 8. BEST MODEL
-# =========================
-
+# BEST MODEL
 best_model_name = max(results, key=lambda x: results[x][3])
 best_model = results[best_model_name][0]
 
@@ -167,10 +140,7 @@ print("\n🏆 BEST MODEL:", best_model_name)
 print("R2:", results[best_model_name][3])
 
 
-# =========================
-# 9. 72-HOUR FORECAST (3 DAYS)
-# =========================
-
+# 72-HOUR FORECAST (3 DAYS)
 def forecast_72_hours(model, df, features):
 
     df_copy = df.copy().reset_index(drop=True)
@@ -194,7 +164,6 @@ def forecast_72_hours(model, df, features):
         new_row["aqi_lag2"] = latest["aqi_lag1"]
         new_row["aqi_lag1"] = latest["aqi_index"]
 
-        # aqi_lag24: carry latest["aqi_lag24"] for first 24 steps (no predicted history yet),
         # then look back 24 rows into the growing df_copy
         if i < 24:
             new_row["aqi_lag24"] = latest["aqi_lag24"]
@@ -219,10 +188,7 @@ def forecast_72_hours(model, df, features):
 future_72h = forecast_72_hours(best_model, df_latest, features)
 
 
-# =========================
-# 10. CONVERT TO DAILY FORECAST
-# =========================
-
+# CONVERT TO DAILY FORECAST
 future_hours = pd.DataFrame({
     "predicted_aqi": np.round(future_72h, 3)
 })
@@ -236,25 +202,16 @@ for _, row in daily_forecast.iterrows():
     print(f"{row['day']}: {row['predicted_aqi']:.2f}")
 
 
-# =========================
-# 11. SAVE MODEL
-# =========================
-
+# SAVE MODEL
 os.makedirs("models", exist_ok=True)
 joblib.dump(best_model, f"models/{best_model_name}_model.pkl")
 
 
-# =========================
-# 12. SAVE FORECAST
-# =========================
-
+# SAVE FORECAST
 daily_forecast.to_csv("models/next_3_days_aqi.csv", index=False)
 
 
-# =========================
-# 13. METADATA
-# =========================
-
+# METADATA
 pd.DataFrame([{
     "model": best_model_name,
     "mae": np.round(results[best_model_name][1], 3),
@@ -264,4 +221,4 @@ pd.DataFrame([{
 }]).to_csv("models/model_metadata.csv", index=False)
 
 
-print("\n✅ HOURLY PIPELINE + 3-DAY FORECAST COMPLETE")
+print("\n3-DAY FORECAST COMPLETE")
