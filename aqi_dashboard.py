@@ -19,19 +19,15 @@ from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
 import shap
 
-# ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
-# ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="AQI Forecast · Intelligence",
+    page_title="AQI Forecast - Matiari",
     page_icon="🌫️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ─────────────────────────────────────────────────────────────────────────────
-# CUSTOM CSS  (dark-industrial aesthetic — amber accents on near-black)
-# ─────────────────────────────────────────────────────────────────────────────
+# CUSTOM CSS 
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
@@ -145,9 +141,7 @@ hr { border-color: var(--border) !important; }
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # AQI HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
 def aqi_category(val):
     v = float(val)
     if v <= 50:   return "Good",          "#3ecf8e"
@@ -189,9 +183,7 @@ def aqi_gauge(val):
     return fig
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # DATA LOADING
-# ─────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def load_data(uri: str) -> pd.DataFrame:
     client = MongoClient(uri)
@@ -205,9 +197,7 @@ def load_data(uri: str) -> pd.DataFrame:
     return df
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # FEATURE ENGINEERING
-# ─────────────────────────────────────────────────────────────────────────────
 FEATURES = [
     "temp","humidity","pressure","wind_speed","wind_deg","clouds",
     "aqi_lag1","aqi_lag2","aqi_lag3","aqi_lag24",
@@ -240,9 +230,7 @@ def engineer_features(df: pd.DataFrame):
     return df_model, df_latest
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # MODEL TRAINING
-# ─────────────────────────────────────────────────────────────────────────────
 def train_models(df: pd.DataFrame):
     X = df[FEATURES]
     y = df["target"]
@@ -275,9 +263,7 @@ def train_models(df: pd.DataFrame):
     return results, best_name, X_train, X_test, y_test
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # 72-HOUR FORECAST
-# ─────────────────────────────────────────────────────────────────────────────
 def forecast_72h(model, df: pd.DataFrame) -> list:
     # Exact mirror of forecast_72_hours() in train_models.py
     df_copy = df.copy().reset_index(drop=True)
@@ -310,9 +296,7 @@ def forecast_72h(model, df: pd.DataFrame) -> list:
     return predictions
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SHAP EXPLAINER
-# ─────────────────────────────────────────────────────────────────────────────
+# SHAP COMPUTATION
 def compute_shap(model, X_train, X_test, model_name: str):
     try:
         if model_name in ("XGBoost", "LightGBM", "RandomForest"):
@@ -327,9 +311,7 @@ def compute_shap(model, X_train, X_test, model_name: str):
         return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PLOTLY HELPERS
-# ─────────────────────────────────────────────────────────────────────────────
+# vISUALIZATION HELPERS
 DARK_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
@@ -417,28 +399,20 @@ def plot_actual_vs_pred(y_test, preds):
     return fig
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # SIDEBAR
-# ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
     <div style='font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;
                 color:#f5a623;letter-spacing:.06em;margin-bottom:.2rem'>
-        🌫️ AQI INTEL
+        🌫️ AQI Dashboard
     </div>
     <div style='font-size:.7rem;color:#6b6b7a;letter-spacing:.1em;
                 text-transform:uppercase;margin-bottom:1.5rem'>
-        Air Quality Intelligence Platform
+        Air Quality - Matiari, sindh, Pakistan
     </div>
     """, unsafe_allow_html=True)
 
-    mongo_uri = st.text_input(
-        "MongoDB URI",
-        value=os.getenv("MONGODB_URI", ""),
-        type="password",
-        placeholder="mongodb+srv://...",
-        help="Your MongoDB connection string"
-    )
+    mongo_uri = os.getenv("MONGODB_URI", "")
 
     st.markdown("---")
     st.markdown("<div style='font-size:.7rem;color:#6b6b7a;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.7rem'>AQI Thresholds</div>", unsafe_allow_html=True)
@@ -463,9 +437,7 @@ with st.sidebar:
     run_btn = st.button("⚡ Train & Forecast", use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # MAIN AREA — HEADER
-# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style='font-family:Syne,sans-serif;font-size:2rem;font-weight:800;
             letter-spacing:.04em;margin-bottom:.2rem'>
@@ -476,9 +448,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────────────────────────────────────
 # MAIN LOGIC
-# ─────────────────────────────────────────────────────────────────────────────
 if not run_btn:
     st.markdown("""
     <div style='border:1px dashed #2a2a30;border-radius:8px;padding:3rem;
@@ -493,7 +463,7 @@ if not mongo_uri:
     st.error("⚠️ Please provide a MongoDB URI in the sidebar.")
     st.stop()
 
-# ── Load ─────────────────────────────────────────────────────────────────────
+# Loading
 with st.spinner("Connecting to MongoDB & loading data…"):
     try:
         df_raw = load_data(mongo_uri)
@@ -504,25 +474,25 @@ with st.spinner("Connecting to MongoDB & loading data…"):
 st.success(f"✅ Loaded **{len(df_raw):,}** hourly records — from "
            f"`{df_raw['datetime'].min().date()}` to `{df_raw['datetime'].max().date()}`")
 
-# ── Engineer ─────────────────────────────────────────────────────────────────
+# feature engineering
 with st.spinner("Engineering features…"):
     df_model, df_latest = engineer_features(df_raw)
 
-# ── Train ────────────────────────────────────────────────────────────────────
+# Training
 with st.spinner("Training 5 models…"):
     results, best_name, X_train, X_test, y_test = train_models(df_model)
 
 best = results[best_name]
 
-# ── Forecast ─────────────────────────────────────────────────────────────────
+# Forecasting
 with st.spinner("Generating 72-hour forecast…"):
     preds_72 = forecast_72h(best["model"], df_latest)
 
-# ── SHAP ─────────────────────────────────────────────────────────────────────
+# SHAP
 with st.spinner("Computing SHAP values…"):
     shap_vals = compute_shap(best["model"], X_train, X_test, best_name)
 
-# ── Daily aggregates ─────────────────────────────────────────────────────────
+# Daily aggregates
 daily_aqi = [
     np.mean(preds_72[0:24]),
     np.mean(preds_72[24:48]),
@@ -531,9 +501,7 @@ daily_aqi = [
 base_dt = df_latest["datetime"].iloc[-1]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 1 — KPIs
-# ─────────────────────────────────────────────────────────────────────────────
+# KPIs
 st.markdown("<div class='sec-head'>Current Snapshot</div>", unsafe_allow_html=True)
 
 current_aqi = float(df_raw["aqi_index"].iloc[-1])
@@ -546,7 +514,7 @@ c3.metric("R²",           f"{best['r2']:.4f}")
 c4.metric("MAE",          f"{best['mae']:.2f}")
 c5.metric("RMSE",         f"{best['rmse']:.2f}")
 
-# ── Gauge + Historical ───────────────────────────────────────────────────────
+# Gauge + Historical
 g_col, h_col = st.columns([1, 2])
 with g_col:
     st.plotly_chart(aqi_gauge(current_aqi), use_container_width=True)
@@ -554,9 +522,7 @@ with h_col:
     st.plotly_chart(plot_historical(df_raw), use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 2 — ALERTS
-# ─────────────────────────────────────────────────────────────────────────────
+# ALERTS
 st.markdown("<div class='sec-head'>Active Alerts</div>", unsafe_allow_html=True)
 
 alerts_triggered = False
@@ -601,9 +567,7 @@ if not alerts_triggered:
     </div>""", unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 3 — 3-DAY FORECAST CARDS
-# ─────────────────────────────────────────────────────────────────────────────
+# DAY FORECAST CARDS
 st.markdown("<div class='sec-head'>3-Day AQI Forecast</div>", unsafe_allow_html=True)
 
 day_labels = [
@@ -628,9 +592,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.plotly_chart(plot_forecast_line(preds_72, base_dt), use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 4 — MODEL COMPARISON
-# ─────────────────────────────────────────────────────────────────────────────
+# MODEL COMPARISON
 st.markdown("<div class='sec-head'>Model Benchmark</div>", unsafe_allow_html=True)
 
 st.plotly_chart(plot_model_comparison(results), use_container_width=True)
@@ -643,53 +605,21 @@ with st.expander("📋 Detailed Metrics Table"):
                      "Best": "🏆" if name == best_name else ""})
     st.dataframe(pd.DataFrame(rows).set_index("Model"), use_container_width=True)
 
-# ── Actual vs Predicted ──────────────────────────────────────────────────────
+# Actual vs Predicted
 st.plotly_chart(plot_actual_vs_pred(y_test, best["preds"]), use_container_width=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 5 — SHAP
-# ─────────────────────────────────────────────────────────────────────────────
+# SHAP
 st.markdown("<div class='sec-head'>SHAP Feature Importance</div>", unsafe_allow_html=True)
 
 if shap_vals is not None:
     st.plotly_chart(plot_shap(shap_vals, X_test), use_container_width=True)
 
-    with st.expander("ℹ️ How to read SHAP values"):
-        st.markdown("""
-        **SHAP (SHapley Additive exPlanations)** measures each feature's
-        contribution to individual predictions.
-
-        - **Mean |SHAP|** = average magnitude of impact across all test samples.
-        - A high value means the feature *consistently moves* the predicted AQI up or down.
-        - Lag features dominate in time-series tasks — recent AQI is the strongest signal.
-        - Weather features (humidity, wind speed) show secondary influence on pollution dispersion.
-        """)
-
-    # Top-3 insight callout
-    mean_abs = np.abs(shap_vals).mean(axis=0)
-    top3 = pd.Series(mean_abs, index=X_test.columns).sort_values(ascending=False).head(3)
-    st.markdown(f"""
-    <div style='background:#141417;border:1px solid #2a2a30;border-radius:6px;
-                padding:1rem 1.2rem;font-size:.8rem;line-height:1.8'>
-        <span style='color:#f5a623;font-weight:700'>Top 3 drivers for {best_name}:</span><br>
-        {'  ·  '.join([f"<span style='color:#4fb3ff'>{f}</span> ({v:.3f})" for f,v in top3.items()])}
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.info("SHAP could not be computed for this model configuration.")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 6 — RAW DATA EXPLORER
-# ─────────────────────────────────────────────────────────────────────────────
+# RAW DATA EXPLORER
 with st.expander("🗄️ Raw Data Explorer (last 200 rows)"):
     st.dataframe(df_raw.tail(200), use_container_width=True)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
 # FOOTER
-# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <hr style='margin-top:2rem'>
 <div style='text-align:center;font-size:.68rem;color:#6b6b7a;
