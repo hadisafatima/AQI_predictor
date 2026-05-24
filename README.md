@@ -25,9 +25,9 @@ Automated data collection · Feature engineering · Multi-model training · Real
 
 ## Project Overview
 
-This project delivers a fully automated AQI forecasting system for **Matiari, Sindh, Pakistan** (25.5961°N, 68.4467°E) — a region with seasonal smog events, agricultural burning cycles, and proximity to Hyderabad's industrial zone where real-time air quality monitoring is limited.
+This project delivers a fully automated AQI forecasting system for **Matiari, Sindh, Pakistan** — a region with seasonal smog events, agricultural burning cycles, and proximity to Hyderabad's industrial zone where real-time air quality monitoring is limited.
 
-The system runs end-to-end without manual intervention: it collects live hourly weather and pollutant data, stores it in a cloud database, retrains machine learning models daily, and serves a 3-day AQI forecast through an interactive web dashboard with hazard alerts and explainability.
+The system runs end-to-end without manual intervention: it collects live hourly weather and pollutant data, stores it in a cloud database, retrains machine learning models daily, and serves a 3-day AQI forecast through an interactive web dashboard with hazard alerts.
 
 ---
 
@@ -63,7 +63,7 @@ OpenWeatherMap API          Open-Meteo Archive API
 | Live Data | OpenWeatherMap API (weather + air pollution) |
 | Historical Data | Open-Meteo Archive & Air Quality APIs (free, no key) |
 | Feature Store | MongoDB Atlas (serverless, free M0 tier) |
-| ML Models | scikit-learn, XGBoost, LightGBM |
+| ML Models | LinearRegression, Ridge, RandomForest, XGBoost, LightGBM |
 | Explainability | SHAP (TreeExplainer / LinearExplainer) |
 | Dashboard | Streamlit + Plotly |
 | Automation | GitHub Actions (hourly + daily schedules) |
@@ -116,7 +116,7 @@ The 72 hourly predictions are grouped into three blocks of 24 and averaged to pr
 
 ### Dashboard (`aqi_dashboard.py`)
 
-The dashboard connects to MongoDB using a URI entered in the sidebar, then runs the full pipeline on demand when the user clicks Train & Forecast. It displays a real-time AQI gauge for the current reading, a 7-day historical trend chart, a 72-hour forecast line chart with AQI band shading, three day-forecast cards with colour-coded severity, a five-model benchmark comparison, an actual-vs-predicted chart on the test set, and a SHAP feature importance chart. A tiered alert system evaluates both current and forecasted AQI and surfaces contextual warnings.
+The dashboard connects to MongoDB using the respective URI, then runs the full pipeline when the user clicks Train & Forecast. It displays a real-time AQI gauge for the current reading, a 7-day historical trend chart, a 72-hour forecast line chart with AQI band shading, three day-forecast cards with colour-coded severity, a five-model benchmark comparison, an actual-vs-predicted chart on the test set, and a SHAP feature importance chart. A tiered alert system evaluates both current and forecasted AQI and surfaces contextual warnings.
 
 ---
 
@@ -124,13 +124,12 @@ The dashboard connects to MongoDB using a URI entered in the sidebar, then runs 
 
 Five models are trained and benchmarked on every pipeline run. The winner is automatically selected by R² score.
 
-| Model | Role |
-|---|---|
-| Linear Regression | Interpretable baseline |
-| Ridge Regression | Handles correlated lag features via L2 regularisation |
-| Random Forest | Non-linear ensemble baseline |
-| XGBoost | Gradient-boosted trees; typically highest accuracy |
-| LightGBM | Faster gradient boosting; competitive on larger datasets |
+### Models
+1. Linear Regression 
+2. Ridge Regression
+3. Random Forest
+4. XGBoost
+5. LightGBM 
 
 Models are evaluated on MAE (average AQI units off), RMSE (penalises large errors), and R² (overall fit quality, used for selection).
 
@@ -171,65 +170,34 @@ The **daily workflow** triggers `train_models.py` every morning at 2 AM UTC. It 
 
 ## Challenges & Resolutions
 
-### 1. Forecast values exploding on Day 2 and Day 3
+### 1. Hopsworks Integration Issues
+Faced connectivity and setup problems with Hopsworks, so the project was migrated to MongoDB Atlas for easier cloud storage, scalability, and smoother real-time data handling.
 
-The first time the forecast ran, Day 1 looked plausible but Day 2 reached 609 and Day 3 reached 691 — physically impossible AQI values.
+### 2. API Reliability Problems
+External AQI and weather APIs sometimes returned missing or inconsistent data. This was solved using error handling, retries, and data validation techniques.
 
-The root cause was a single incorrect line in the forecast loop: `aqi_lag24` was being set to the value of `aqi_lag1` (the 1-hour-ago AQI) instead of the actual 24-hours-ago AQI. Since `aqi_lag24` captures the diurnal pollution cycle, feeding it the wrong value immediately corrupted the model's most important contextual signal. Because each step feeds into the next, the error compounded over 48 steps until predictions were completely outside the training distribution.
+### 3. Model Training Complexity
+Managing multiple ML models and retraining pipelines was challenging. A modular training pipeline was created to automate preprocessing, training, and evaluation.
 
-The fix was to carry the real precomputed `aqi_lag24` value for the first 24 forecast steps (before any predicted history exists), then look back 24 rows into the growing prediction history for all subsequent steps.
+### 4. Streamlit & Import Errors
+Issues like ModuleNotFoundError and poor project structure were resolved by reorganizing the project into modular folders and reusable components.
 
----
+### 5. Feature Engineering Challenges
+Converting raw AQI/weather data into useful features required extensive preprocessing, including time-based and lag features to improve prediction accuracy.
 
-### 2. Script and dashboard producing different forecast values despite identical models
+### 6. Real-Time Prediction Stability
+AQI values fluctuate rapidly, affecting forecast consistency. Regular retraining and rolling historical data windows improved prediction reliability.
 
-After fixing the lag24 bug, `train_models.py` gave Day 1 as 226 while the dashboard showed 257 — a persistent ~30 AQI unit gap on the first day.
+### 7. Serverless Architecture Management
+Integrating cloud services and automation in a fully serverless environment was difficult initially, but optimized workflows and lightweight architecture solved scalability issues.
 
-The root cause was that both forecast functions were starting from different rows. The training script passed its DataFrame to the forecast function after adding the target column and dropping the resulting NaN row — which silently removed the single most recent real data point. The dashboard was already using a pre-snapshot copy, so it started from the true latest reading while the script always started one hour behind.
-
-The fix was to snapshot the DataFrame before the target shift in both files, and pass that snapshot as the forecast seed. Once both functions started from the same row, their outputs matched exactly.
-
----
-
-### 3. Plotly `update_layout()` crash — duplicate keyword argument
-
-The dashboard crashed on startup with a Python `TypeError` about `margin` being passed twice to `update_layout()`.
-
-The cause was a shared layout dictionary (`DARK_LAYOUT`) that already contained a `margin` definition. The SHAP plot function then also passed its own `margin` as a separate keyword argument. When both were unpacked into the same function call, Python raised an error because the same keyword appeared twice.
-
-The fix was to merge both dictionaries into one before the call, so the SHAP-specific `margin` cleanly overrides the shared default.
-
----
-
-### 4. MongoDB TLS certificate errors on Windows and GitHub Actions
-
-Connecting to MongoDB Atlas failed on certain Windows development machines and GitHub Actions runners with an SSL certificate verification error.
-
-The cause was that those environments lacked the full CA certificate bundle needed to validate MongoDB Atlas's TLS certificate chain. The fix was to add `tls=True` and `tlsAllowInvalidCertificates=True` to the MongoClient constructor. This is acceptable for a development and low-stakes forecasting context; for a production system, the proper CA certificate path should be specified instead.
-
----
-
-### 5. Historical backfill inserting duplicate records on re-run
-
-Running `historical_fetch.py` a second time doubled every record in MongoDB, which skewed the training data by giving historical periods twice the weight of recent data.
-
-The cause was that `insert_one()` performs no deduplication — it always creates a new document. The fix was to switch to an upsert operation keyed on the `(city, datetime)` pair, so re-running the backfill safely updates existing records rather than duplicating them.
-
----
-
-### 6. Streamlit re-running the full MongoDB query on every UI interaction
-
-Every time a user interacted with any widget on the dashboard — even just hovering over a chart — Streamlit reran the entire script, triggering a fresh MongoDB connection and full data load. This caused 5–10 second delays and occasional connection pool exhaustion.
-
-The fix was to wrap the data loading function in Streamlit's `@st.cache_data` decorator, using the MongoDB URI as the cache key. Data is fetched once per session and served from memory on all subsequent reruns, making the dashboard feel instantaneous after the initial load.
-
----
+<!-- ---
 
 ## Results
 
-The system consistently achieves strong performance on Matiari's hourly AQI data. R² scores typically fall between 0.92 and 0.98, MAE between 5 and 18 AQI units, and RMSE between 8 and 25 AQI units. XGBoost and LightGBM are the most frequent winners. SHAP analysis consistently identifies `aqi_lag1`, `aqi_lag2`, and `aqi_roll_3` as the top prediction drivers, confirming that recent AQI history dominates short-term forecasting for Matiari's pollution patterns.
+The system consistently achieves strong performance on Matiari's hourly AQI data. R² scores typically fall between 0.92 and 0.98, MAE between 5 and 18 AQI units, and RMSE between 8 and 25 AQI units. XGBoost and LightGBM are the most frequent winners. SHAP analysis consistently identifies `aqi_lag1`, `aqi_lag2`, and `aqi_roll_3` as the top prediction drivers, confirming that recent AQI history dominates short-term forecasting for Matiari's pollution patterns. -->
 
----
+<!-- ---
 
 ## Future Improvements
 
@@ -238,7 +206,7 @@ The system consistently achieves strong performance on Matiari's hourly AQI data
 - Migrate from MongoDB to Hopsworks for full feature versioning and point-in-time correctness
 - Add forecast confidence intervals via quantile regression or conformal prediction
 - Extend coverage to Hyderabad, Sukkur, and other Sindh cities
-- Add WhatsApp or SMS push alerts for hazardous AQI events via Twilio
+- Add WhatsApp or SMS push alerts for hazardous AQI events via Twilio -->
 
 ---
 
