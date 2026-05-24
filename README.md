@@ -1,11 +1,5 @@
 # 🌫️ AQI Forecast — Matiari Air Quality Intelligence Platform
 
-<!-- > End-to-end serverless machine learning pipeline for 72-hour Air Quality Index forecasting in **Matiari, Sindh, Pakistan**.
-
-Automated data collection · Feature engineering · Multi-model training · Real-time Streamlit dashboard · SHAP explainability · Hazard alerts -->
-
-<!-- --- -->
-
 ## Project Overview
 
 This project delivers a fully automated AQI forecasting system for **Matiari, Sindh, Pakistan** — a region with seasonal smog events, agricultural burning cycles, and proximity to Hyderabad's industrial zone.
