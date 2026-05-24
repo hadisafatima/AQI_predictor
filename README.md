@@ -4,11 +4,11 @@
 
 Automated data collection · Feature engineering · Multi-model training · Real-time Streamlit dashboard · SHAP explainability · Hazard alerts -->
 
----
+<!-- --- -->
 
 ## Project Overview
 
-This project delivers a fully automated AQI forecasting system for **Matiari, Sindh, Pakistan** — a region with seasonal smog events, agricultural burning cycles, and proximity to Hyderabad's industrial zone where real-time air quality monitoring is limited.
+This project delivers a fully automated AQI forecasting system for **Matiari, Sindh, Pakistan** — a region with seasonal smog events, agricultural burning cycles, and proximity to Hyderabad's industrial zone.
 
 The system runs end-to-end without manual intervention: it collects live hourly weather and pollutant data, stores it in a cloud database, retrains machine learning models daily, and serves a 3-day AQI forecast through an interactive web dashboard with hazard alerts.
 
