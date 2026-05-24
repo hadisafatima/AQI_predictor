@@ -6,23 +6,6 @@ Automated data collection · Feature engineering · Multi-model training · Real
 
 ---
 
-## Table of Contents
-
-1. [Project Overview](#project-overview)
-2. [Architecture](#architecture)
-3. [Tech Stack](#tech-stack)
-4. [Workflow](#workflow)
-5. [Pipeline Details](#pipeline-details)
-6. [Models & Evaluation](#models--evaluation)
-7. [SHAP Explainability](#shap-explainability)
-8. [Alerts System](#alerts-system)
-9. [CI/CD Automation](#cicd-automation)
-10. [Challenges & Resolutions](#challenges--resolutions)
-11. [Results](#results)
-12. [Future Improvements](#future-improvements)
-
----
-
 ## Project Overview
 
 This project delivers a fully automated AQI forecasting system for **Matiari, Sindh, Pakistan** — a region with seasonal smog events, agricultural burning cycles, and proximity to Hyderabad's industrial zone where real-time air quality monitoring is limited.
@@ -191,27 +174,10 @@ AQI values fluctuate rapidly, affecting forecast consistency. Regular retraining
 ### 7. Serverless Architecture Management
 Integrating cloud services and automation in a fully serverless environment was difficult initially, but optimized workflows and lightweight architecture solved scalability issues.
 
-<!-- ---
-
-## Results
-
-The system consistently achieves strong performance on Matiari's hourly AQI data. R² scores typically fall between 0.92 and 0.98, MAE between 5 and 18 AQI units, and RMSE between 8 and 25 AQI units. XGBoost and LightGBM are the most frequent winners. SHAP analysis consistently identifies `aqi_lag1`, `aqi_lag2`, and `aqi_roll_3` as the top prediction drivers, confirming that recent AQI history dominates short-term forecasting for Matiari's pollution patterns. -->
-
-<!-- ---
-
-## Future Improvements
-
-- Replace `max(pollutants)` with the official US EPA breakpoint-based AQI formula for each pollutant
-- Add LSTM or Temporal Fusion Transformer models for longer-horizon and sequence-aware forecasting
-- Migrate from MongoDB to Hopsworks for full feature versioning and point-in-time correctness
-- Add forecast confidence intervals via quantile regression or conformal prediction
-- Extend coverage to Hyderabad, Sukkur, and other Sindh cities
-- Add WhatsApp or SMS push alerts for hazardous AQI events via Twilio -->
-
 ---
 
 <div align="center">
 
-Built for **Matiari, Sindh, Pakistan 🇵🇰** · Predicting air quality so communities can breathe safer.
+Built for **Matiari, Sindh, Pakistan 🇵🇰**
 
 </div>
