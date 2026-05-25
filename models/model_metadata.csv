@@ -1,2 +1,2 @@
 model,mae,rmse,r2,trained_at
-LinearRegression,9.71,15.688,0.973,2026-05-24
+LinearRegression,10.123,15.974,0.973,2026-05-25
