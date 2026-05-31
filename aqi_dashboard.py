@@ -12,7 +12,7 @@ import shap
 import warnings
 warnings.filterwarnings("ignore")
 
-# ── PAGE CONFIG ───────────────────────────────────────────────────────────────
+# PAGE CONFIG
 st.set_page_config(
     page_title="AQI Forecast - Matiari",
     page_icon="🌫️",
@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── CUSTOM CSS ────────────────────────────────────────────────────────────────
+# CUSTOM CSS
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
@@ -97,7 +97,7 @@ hr { border-color: var(--border) !important; }
 """, unsafe_allow_html=True)
 
 
-# ── AQI HELPERS ───────────────────────────────────────────────────────────────
+# AQI HELPERS
 def aqi_category(val):
     v = float(val)
     if v <= 50:  return "Good",                "#3ecf8e"
@@ -135,7 +135,7 @@ def aqi_gauge(val):
     return fig
 
 
-# ── MONGO HELPERS ─────────────────────────────────────────────────────────────
+# MONGO HELPERS
 @st.cache_data(show_spinner=False)
 def load_weather_data(uri: str) -> pd.DataFrame:
     client = MongoClient(uri)
@@ -186,7 +186,7 @@ def load_all_metadata(uri: str) -> dict:
     return {d["model_name"]: d for d in docs}
 
 
-# ── FEATURES ──────────────────────────────────────────────────────────────────
+# FEATURES
 FEATURES = [
     "temp", "humidity", "pressure", "wind_speed", "wind_deg", "clouds",
     "aqi_lag1", "aqi_lag2", "aqi_lag3", "aqi_lag24",
@@ -206,7 +206,7 @@ def build_forecast_seed(df: pd.DataFrame) -> pd.DataFrame:
     return df.dropna().reset_index(drop=True)
 
 
-# ── 72-HOUR FORECAST ──────────────────────────────────────────────────────────
+# 72-HOUR FORECAST
 def forecast_72h(model, df_seed: pd.DataFrame) -> list:
     df_copy = df_seed.copy().reset_index(drop=True)
     predictions = []
@@ -231,7 +231,7 @@ def forecast_72h(model, df_seed: pd.DataFrame) -> list:
     return predictions
 
 
-# ── SHAP ──────────────────────────────────────────────────────────────────────
+# SHAP 
 def compute_shap(model, df_seed: pd.DataFrame, model_name: str):
     X_sample = df_seed[FEATURES].tail(200)
     try:
@@ -248,7 +248,7 @@ def compute_shap(model, df_seed: pd.DataFrame, model_name: str):
         return None, None
 
 
-# ── DARK LAYOUT ───────────────────────────────────────────────────────────────
+# DARK LAYOUT
 DARK_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family="IBM Plex Mono", color="#e8e8ec"),
@@ -333,7 +333,7 @@ def plot_shap(shap_vals, X_sample):
     return fig
 
 
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
+# SIDEBAR 
 with st.sidebar:
     st.markdown("""
     <div style='font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;
@@ -373,7 +373,7 @@ with st.sidebar:
     run_btn = st.button("⚡ Load & Forecast", use_container_width=True)
 
 
-# ── HEADER ────────────────────────────────────────────────────────────────────
+# HEADER
 st.markdown("""
 <div style='font-family:Syne,sans-serif;font-size:2rem;font-weight:800;
             letter-spacing:.04em;margin-bottom:.2rem'>
@@ -399,7 +399,7 @@ if not mongo_uri:
     st.stop()
 
 
-# ── STEP 1 · WEATHER DATA ─────────────────────────────────────────────────────
+# STEP 1 · WEATHER DATA 
 with st.spinner("Fetching weather data from MongoDB…"):
     try:
         df_raw = load_weather_data(mongo_uri)
@@ -411,7 +411,7 @@ st.success(f"✅ Loaded **{len(df_raw):,}** hourly records — "
            f"`{df_raw['datetime'].min().date()}` → `{df_raw['datetime'].max().date()}`")
 
 
-# ── STEP 2 · LOAD ALL MODELS ──────────────────────────────────────────────────
+# STEP 2 · LOAD ALL MODELS
 with st.spinner("Loading all 5 models from MongoDB…"):
     try:
         models_dict, best_name = load_all_models_from_mongo(mongo_uri)
@@ -431,12 +431,12 @@ st.info(f"🤖 **{len(models_dict)} models** loaded · "
         f"🏆 Best: **{best_name}** · trained on `{trained_at}`")
 
 
-# ── STEP 3 · FORECAST SEED ────────────────────────────────────────────────────
+# STEP 3 · FORECAST SEED
 with st.spinner("Engineering features…"):
     df_seed = build_forecast_seed(df_raw)
 
 
-# ── STEP 4 · 72-HOUR FORECAST (best model) ───────────────────────────────────
+# STEP 4 · 72-HOUR FORECAST (best model) 
 with st.spinner(f"Running 72-hour forecast with {best_name}…"):
     preds_72 = forecast_72h(best_model, df_seed)
 
@@ -448,12 +448,12 @@ daily_aqi = [
 ]
 
 
-# ── STEP 5 · SHAP ─────────────────────────────────────────────────────────────
+# STEP 5 · SHAP
 with st.spinner("Computing SHAP values…"):
     shap_vals, X_sample = compute_shap(best_model, df_seed, best_name)
 
 
-# ── KPIs ──────────────────────────────────────────────────────────────────────
+# KPIs
 st.markdown("<div class='sec-head'>Current Snapshot</div>", unsafe_allow_html=True)
 
 current_aqi      = float(df_raw["aqi_index"].iloc[-1])
@@ -467,7 +467,7 @@ c4.metric("MAE",         f"{best_meta.get('mae', '—')}")
 c5.metric("RMSE",        f"{best_meta.get('rmse','—')}")
 
 
-# ── GAUGE + HISTORY ───────────────────────────────────────────────────────────
+# GAUGE + HISTORY 
 g_col, h_col = st.columns([1, 2])
 with g_col:
     st.plotly_chart(aqi_gauge(current_aqi), use_container_width=True)
@@ -475,7 +475,7 @@ with h_col:
     st.plotly_chart(plot_historical(df_raw), use_container_width=True)
 
 
-# ── ALERTS ────────────────────────────────────────────────────────────────────
+# ALERTS
 st.markdown("<div class='sec-head'>Active Alerts</div>", unsafe_allow_html=True)
 alerts_triggered = False
 
@@ -514,7 +514,7 @@ if not alerts_triggered:
     </div>""", unsafe_allow_html=True)
 
 
-# ── 3-DAY FORECAST CARDS ──────────────────────────────────────────────────────
+# 3-DAY FORECAST CARDS 
 st.markdown("<div class='sec-head'>3-Day AQI Forecast</div>", unsafe_allow_html=True)
 
 day_labels = [
@@ -537,7 +537,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.plotly_chart(plot_forecast_line(preds_72, base_dt), use_container_width=True)
 
 
-# ── MODEL COMPARISON ──────────────────────────────────────────────────────────
+# MODEL COMPARISON
 st.markdown("<div class='sec-head'>Model Comparison</div>", unsafe_allow_html=True)
 
 if all_metadata:
@@ -577,19 +577,19 @@ if all_metadata:
         st.dataframe(pd.DataFrame(rows).set_index("Model"), use_container_width=True)
 
 
-# ── SHAP FEATURE IMPORTANCE ───────────────────────────────────────────────────
+# SHAP FEATURE IMPORTANCE
 st.markdown("<div class='sec-head'>SHAP Feature Importance</div>", unsafe_allow_html=True)
 
 if shap_vals is not None:
     st.plotly_chart(plot_shap(shap_vals, X_sample), use_container_width=True)
 
 
-# ── RAW DATA EXPLORER ─────────────────────────────────────────────────────────
+# RAW DATA EXPLORER
 with st.expander("🗄️ Raw Data Explorer (last 200 rows)"):
     st.dataframe(df_raw.tail(200), use_container_width=True)
 
 
-# ── FOOTER ────────────────────────────────────────────────────────────────────
+# FOOTER 
 st.markdown("""
 <hr style='margin-top:2rem'>
 <div style='text-align:center;font-size:.68rem;color:#6b6b7a;

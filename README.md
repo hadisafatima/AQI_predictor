@@ -14,9 +14,15 @@ OpenWeatherMap API          Open-Meteo Archive API
                    ▼
         MongoDB Atlas — Feature Store
         (aqi_db · weather_data collection)
+                   │
                    ▼
            train_models.py
      (feature engineering + training)
+                   │
+                   ▼
+        MongoDB Atlas — Model Store
+        (aqi_db · models collection)
+                   │
                    ▼
           aqi_dashboard.py
    (Streamlit · forecast · SHAP · alerts)
@@ -30,7 +36,8 @@ OpenWeatherMap API          Open-Meteo Archive API
 |---|---|
 | Live Data | OpenWeatherMap API (weather + air pollution) |
 | Historical Data | Open-Meteo Archive & Air Quality APIs (free, no key) |
-| Feature Store | MongoDB Atlas (serverless, free M0 tier) |
+| Feature Store | MongoDB Atlas — `weather_data` collection |
+| Model Store | MongoDB Atlas — `models` collection (serialised with GridFS) |
 | ML Models | LinearRegression, Ridge, RandomForest, XGBoost, LightGBM |
 | Explainability | SHAP (TreeExplainer / LinearExplainer) |
 | Dashboard | Streamlit + Plotly |
@@ -61,7 +68,7 @@ Fetches weather (temperature, humidity, pressure, wind, cloud cover) and air pol
 A one-time script that seeded MongoDB with months of historical data using the Open-Meteo Archive and Air Quality APIs (free, no key required). Records are merged on matching timestamps and inserted into the same collection as live data, creating a unified dataset.
 
 ### Training Pipeline (`train_models.py`)
-Loads all MongoDB records and engineers lag features (1h, 2h, 3h, 24h), rolling means (3h, 6h, 24h), and an `aqi_diff` change signal. The DataFrame is snapshotted before the prediction target is created (next hour's AQI via a forward shift) to preserve the most recent row as the forecast seed. Train/test split is strictly time-ordered (80/20) — no shuffling.
+Loads all MongoDB records and engineers lag features (1h, 2h, 3h, 24h), rolling means (3h, 6h, 24h), and an `aqi_diff` change signal. The DataFrame is snapshotted before the prediction target is created (next hour's AQI via a forward shift) to preserve the most recent row as the forecast seed. Train/test split is strictly time-ordered (80/20) — no shuffling. The winning model is serialised and saved back to MongoDB, so the dashboard always loads the latest trained model directly from the cloud.
 
 ### 72-Hour Autoregressive Forecast
 Predicts the next hour's AQI, feeds that prediction back as input, and rolls forward 72 steps — updating all lag and rolling features at each step. `aqi_lag24` uses real seed values for the first 24 steps, then switches to predictions. The 72 hourly values are grouped into three 24-hour blocks and averaged for the daily forecast cards.
@@ -73,7 +80,7 @@ Displays: a real-time AQI gauge, 7-day historical trend, 72-hour forecast chart 
 
 ## Models & Evaluation
 
-Five models are trained and benchmarked on every run. The best R² score wins automatically.
+Five models are trained and benchmarked on every run. The best R² score wins automatically and is serialised back to MongoDB — so the dashboard always loads the latest model directly from the cloud without relying on local files.
 
 1. Linear Regression
 2. Ridge Regression
@@ -109,7 +116,7 @@ Alerts cover both current readings and all three forecast days, giving residents
 Two GitHub Actions workflows run on schedule using repository secrets.
 
 - **Hourly workflow** — triggers `hourly_fetch.py` at the top of every hour; inserts new records into MongoDB.
-- **Daily workflow** — triggers `train_models.py` at 2 AM UTC; retrains all five models and overwrites the saved model artifact and forecast CSV.
+- **Daily workflow** — triggers `train_models.py` at 2 AM UTC; retrains all five models, selects the best, and saves it to MongoDB alongside a fresh forecast CSV.
 
 ---
 
@@ -131,7 +138,7 @@ Two GitHub Actions workflows run on schedule using repository secrets.
 
 - **GitHub Actions** — Built fully automated scheduled pipelines for hourly data collection and daily retraining, learning cron scheduling, secret management, and debugging from workflow logs.
 - **API Data Fetching** — Integrated multiple external APIs and handled real-world issues like missing fields, inconsistent responses, and rate limits through resilient error handling.
-- **Cloud Storage with MongoDB Atlas** — Designed time-series document schemas, queried records efficiently, and used a cloud database as the backbone of an ML pipeline rather than flat files.
+- **Cloud Storage with MongoDB Atlas** — Used MongoDB as both a feature store (time-series weather/AQI records) and a model store (serialised trained models). This eliminated local file dependencies entirely, making the pipeline fully cloud-native.
 - **Autoregressive Forecasting** — Learned how prediction errors compound when fed back as inputs, and how to carefully manage lag features (like `aqi_lag24`) that lack predicted history in early forecast steps.
 - **SHAP Explainability** — Applied model-agnostic and model-specific explainers to understand feature importance, turning a black-box ensemble into interpretable, actionable insights.
 

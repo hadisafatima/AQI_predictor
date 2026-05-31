@@ -13,7 +13,7 @@ import joblib
 from math import sqrt
 from bson.binary import Binary
 
-# ── CONNECT ───────────────────────────────────────────────────────────────────
+# CONNECT 
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
 db = client["aqi_db"]
@@ -23,7 +23,7 @@ models_col    = db["ml_models"]
 forecasts_col = db["aqi_forecasts"]
 metadata_col  = db["model_metadata"]
 
-# ── LOAD DATA ─────────────────────────────────────────────────────────────────
+# LOAD DATA 
 df = pd.DataFrame(list(collection.find()))
 if "_id" in df.columns:
     df.drop(columns=["_id"], inplace=True)
@@ -32,7 +32,7 @@ df["datetime"] = pd.to_datetime(df["datetime"])
 df = df.sort_values("datetime")
 print("Raw data shape:", df.shape)
 
-# ── FEATURE ENGINEERING ───────────────────────────────────────────────────────
+# FEATURE ENGINEERING
 df["aqi_diff"]    = df["aqi_index"].diff()
 df["aqi_lag1"]    = df["aqi_index"].shift(1)
 df["aqi_lag2"]    = df["aqi_index"].shift(2)
@@ -60,7 +60,7 @@ split = int(len(df) * 0.8)
 X_train, X_test = X.iloc[:split], X.iloc[split:]
 y_train, y_test = y.iloc[:split], y.iloc[split:]
 
-# ── MODELS ────────────────────────────────────────────────────────────────────
+# MODELS
 models = {
     "LinearRegression": LinearRegression(),
     "Ridge":            Ridge(alpha=1.0),
@@ -73,7 +73,7 @@ models = {
 
 results = {}
 
-# ── TRAIN + EVALUATE + SAVE ALL MODELS ───────────────────────────────────────
+# TRAIN + EVALUATE + SAVE ALL MODELS 
 print("\nTraining and saving all models...\n")
 
 for name, model in models.items():
@@ -88,7 +88,7 @@ for name, model in models.items():
 
     print(f"{name}  MAE:{mae:.3f}  RMSE:{rmse:.3f}  R2:{r2:.3f}")
 
-    # serialize model to bytes
+    # serialize model to bytes (binary data)
     buf = io.BytesIO()
     joblib.dump(model, buf)
     buf.seek(0)
@@ -108,28 +108,28 @@ for name, model in models.items():
         },
         upsert=True,
     )
-    print(f"  ✅ '{name}' saved to MongoDB\n")
+    print(f"'{name}' saved to MongoDB\n")
 
-# ── MARK BEST MODEL ───────────────────────────────────────────────────────────
+# MARK BEST MODE
 best_name  = max(results, key=lambda x: results[x][3])
 best_model = results[best_name][0]
 
 models_col.update_many({}, {"$set": {"is_best": False}})
 models_col.update_one({"model_name": best_name}, {"$set": {"is_best": True}})
 
-print(f"🏆 BEST MODEL: {best_name}  R2: {results[best_name][3]:.3f}")
+print(f"BEST MODEL: {best_name}  R2: {results[best_name][3]:.3f}")
 
-# ── 72-HOUR RECURSIVE FORECAST ────────────────────────────────────────────────
+# 72-HOUR RECURSIVE FORECAST
 def forecast_72_hours(model, df, features):
     df_copy     = df.copy().reset_index(drop=True)
     predictions = []
 
     for i in range(72):
-        latest  = df_copy.iloc[-1]
+        latest  = df_copy.iloc[-1] # last row from the dataset
         pred    = model.predict(pd.DataFrame([latest[features]]))[0]
         predictions.append(pred)
 
-        new_row = latest.copy()
+        new_row = latest.copy() # cuz model needs data for the next prediction
         new_row["aqi_index"]   = pred
         new_row["aqi_lag3"]    = latest["aqi_lag2"]
         new_row["aqi_lag2"]    = latest["aqi_lag1"]
@@ -149,7 +149,7 @@ def forecast_72_hours(model, df, features):
 
 future_72h = forecast_72_hours(best_model, df_latest, features)
 
-# ── SAVE FORECASTS ────────────────────────────────────────────────────────────
+# SAVE FORECASTS 
 base_dt = df_latest["datetime"].iloc[-1]
 
 hourly_docs = [
@@ -163,9 +163,9 @@ hourly_docs = [
     for i in range(72)
 ]
 
-forecasts_col.delete_many({"model_name": best_name})
-forecasts_col.insert_many(hourly_docs)
-print("✅ 72-hour hourly forecast saved to MongoDB")
+forecasts_col.delete_many({"model_name": best_name}) # removing previous forecasts
+forecasts_col.insert_many(hourly_docs) # adding new forecasts
+print("72-hour hourly forecast saved to MongoDB")
 
 daily_docs = []
 for day_idx in range(3):
@@ -180,9 +180,9 @@ for day_idx in range(3):
     print(f"  Day {day_idx + 1}: {daily_docs[-1]['predicted_aqi']:.2f}")
 
 forecasts_col.insert_many(daily_docs)
-print("✅ 3-day daily forecast saved to MongoDB")
+print("3-day daily forecast saved to MongoDB")
 
-# ── SAVE METADATA FOR ALL MODELS ─────────────────────────────────────────────
+# SAVE METADATA FOR ALL MODELS
 for name, (_, mae, rmse, r2) in results.items():
     metadata_col.replace_one(
         {"model_name": name},
@@ -198,5 +198,5 @@ for name, (_, mae, rmse, r2) in results.items():
         upsert=True,
     )
 
-print("✅ Metadata for all models saved to MongoDB")
+print("Metadata for all models saved to MongoDB")
 print("\n3-DAY FORECAST COMPLETE")
