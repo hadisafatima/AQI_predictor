@@ -4,7 +4,7 @@ An automated AQI forecasting system for **Matiari, Sindh, Pakistan** — a regio
 
 ---
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://hadisafatima-aqi-predictor-aqi-dashboard-khghxu.streamlit.app/)
+🔴 **Live Demo** → [hadisafatima-aqi-predictor.streamlit.app](https://hadisafatima-aqi-predictor-aqi-dashboard-khghxu.streamlit.app/)
 
 ---
 
