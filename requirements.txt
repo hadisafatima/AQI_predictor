@@ -12,16 +12,13 @@ scipy
 xgboost
 lightgbm
 
-# Deep learning (choose one approach)
-tensorflow
-
 # Time series models
 statsmodels
 
 # Utilities
 joblib
 
-# Visualization (optional but recommended)
+# Visualization
 matplotlib
 seaborn
 
