@@ -147,30 +147,31 @@ def load_weather_data(uri: str) -> pd.DataFrame:
 
 
 @st.cache_resource(show_spinner=False)
+@st.cache_resource(show_spinner=False)
 def load_all_models_from_mongo(uri: str):
-    """
-    Load ALL 5 models from ml_models collection.
-    Returns:
-        models_dict  — { model_name: model_object }
-        best_name    — name of the model with is_best=True (fallback: highest r2)
-    """
     client = MongoClient(uri)
-    docs = list(client["aqi_db"]["ml_models"].find())
-    if not docs:
-        raise ValueError(
-            "No trained models found in MongoDB. "
-            "Run train_models.py first."
-        )
-    models_dict = {}
-    for doc in docs:
-        buf = io.BytesIO(bytes(doc["model_binary"]))
-        models_dict[doc["model_name"]] = joblib.load(buf)
+    collection = client["aqi_db"]["ml_models"]
 
-    # find best: prefer is_best flag, fallback to highest r2
-    best_doc = next((d for d in docs if d.get("is_best")), None)
+    # Step 1: fetch lightweight metadata only (no binary) to get names + best flag
+    meta_docs = list(collection.find({}, {"model_name": 1, "is_best": 1, "r2": 1}))
+    if not meta_docs:
+        raise ValueError("No trained models found in MongoDB. Run train_models.py first.")
+
+    # Step 2: determine best model before touching any binary
+    best_doc = next((d for d in meta_docs if d.get("is_best")), None)
     if best_doc is None:
-        best_doc = max(docs, key=lambda d: d.get("r2", -999))
+        best_doc = max(meta_docs, key=lambda d: d.get("r2", -999))
     best_name = best_doc["model_name"]
+
+    # Step 3: load each model binary individually — one find_one() per model
+    # This avoids holding a long-lived cursor over large documents
+    models_dict = {}
+    for meta in meta_docs:
+        name = meta["model_name"]
+        doc  = collection.find_one({"model_name": name}, {"model_binary": 1})
+        if doc and "model_binary" in doc:
+            buf = io.BytesIO(bytes(doc["model_binary"]))
+            models_dict[name] = joblib.load(buf)
 
     return models_dict, best_name
 
