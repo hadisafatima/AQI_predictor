@@ -1,10 +1,6 @@
 # 🌫️ AQI Forecast — Matiari Air Quality Intelligence Platform
 
-## Project Overview
-
-This project delivers a fully automated AQI forecasting system for **Matiari, Sindh, Pakistan** — a region with seasonal smog events, agricultural burning cycles, and proximity to Hyderabad's industrial zone.
-
-The system runs end-to-end without manual intervention: it collects live hourly weather and pollutant data, stores it in a cloud database, retrains machine learning models daily, and serves a 3-day AQI forecast through an interactive web dashboard with hazard alerts.
+An automated AQI forecasting system for **Matiari, Sindh, Pakistan** — a region affected by seasonal smog, agricultural burning cycles, and proximity to Hyderabad's industrial zone. The system collects live hourly data, retrains ML models daily, and serves a 3-day forecast through an interactive dashboard with hazard alerts.
 
 ---
 
@@ -14,18 +10,13 @@ The system runs end-to-end without manual intervention: it collects live hourly 
 OpenWeatherMap API          Open-Meteo Archive API
  (live: hourly data)         (historical backfill)
         │                            │
-        ▼                            ▼
-   hourly_fetch.py          historical_fetch.py
-        │                            │
         └──────────┬─────────────────┘
                    ▼
         MongoDB Atlas — Feature Store
         (aqi_db · weather_data collection)
-                   │
                    ▼
            train_models.py
      (feature engineering + training)
-                   │
                    ▼
           aqi_dashboard.py
    (Streamlit · forecast · SHAP · alerts)
@@ -50,79 +41,57 @@ OpenWeatherMap API          Open-Meteo Archive API
 
 ## Workflow
 
-The system runs as three independent automated stages:
-
 **Stage 1 — Data Collection (every hour)**
-GitHub Actions triggers `hourly_fetch.py` each hour. It pulls current weather and air pollution readings from OpenWeatherMap for Matiari, computes a custom AQI index from the pollutant concentrations, calculates the change rate vs the previous reading, and inserts the enriched record into MongoDB Atlas.
+`hourly_fetch.py` pulls weather and air pollution data from OpenWeatherMap, computes a custom AQI index, calculates change rate vs the previous reading, and inserts the enriched record into MongoDB.
 
 **Stage 2 — Model Training (every day)**
-GitHub Actions triggers `train_models.py` each morning. It loads the full feature history from MongoDB, engineers time-series features, trains five ML models, evaluates them, saves the best one, and writes a 3-day forecast CSV.
+`train_models.py` loads the full feature history, engineers time-series features, trains five ML models, evaluates them, saves the best one, and writes a 3-day forecast CSV.
 
 **Stage 3 — Dashboard (on demand)**
-The Streamlit app is always live. When a user clicks Train & Forecast, it runs the complete pipeline in real time — loading data, training models, generating the 72-hour forecast, computing SHAP values, and rendering all visualisations in one pass.
+The Streamlit app runs the full pipeline on user request — loading data, training models, generating the 72-hour forecast, computing SHAP values, and rendering all visualisations.
 
 ---
 
 ## Pipeline Details
 
 ### Hourly Feature Pipeline (`hourly_fetch.py`)
-
-Every hour, the pipeline fetches two data streams from OpenWeatherMap for Matiari's coordinates and merges them into a single document stored in MongoDB. The weather stream provides temperature, humidity, atmospheric pressure, wind speed and direction, and cloud cover. The air pollution stream provides concentrations of PM2.5, PM10, NO₂, O₃, SO₂, and CO.
-
-The AQI index is computed as the maximum concentration across all available pollutants — a conservative metric that flags the worst-case pollutant as the dominant risk signal. The pipeline also computes `aqi_change_rate` by comparing the current reading against the most recent document in MongoDB, giving the model a real-time trend signal.
-
-Each document also stores time features (hour, day, month, year, day of week) to support potential future seasonality modelling.
+Fetches weather (temperature, humidity, pressure, wind, cloud cover) and air pollution (PM2.5, PM10, NO₂, O₃, SO₂, CO) from OpenWeatherMap. AQI is computed as the max concentration across pollutants — a conservative worst-case signal. `aqi_change_rate` is derived by comparing against the previous MongoDB record. Time features (hour, day, month, etc.) are also stored for seasonality modelling.
 
 ### Historical Backfill (`historical_fetch.py`)
-
-Before the live pipeline had enough data for model training, a one-time backfill script was run to seed MongoDB with months of historical records. It fetches hourly weather from the Open-Meteo Archive API and hourly pollutant concentrations from the Open-Meteo Air Quality API — both free, open APIs that require no key. The two datasets are merged on matching timestamps and inserted into the same MongoDB collection as the live pipeline, creating a seamless unified dataset.
+A one-time script that seeded MongoDB with months of historical data using the Open-Meteo Archive and Air Quality APIs (free, no key required). Records are merged on matching timestamps and inserted into the same collection as live data, creating a unified dataset.
 
 ### Training Pipeline (`train_models.py`)
-
-The training pipeline loads all MongoDB records into a DataFrame and engineers a set of time-series features on top of the raw weather and pollutant fields. Lag features capture AQI values from 1, 2, 3, and 24 hours ago. Rolling mean features capture short-term (3h, 6h) and diurnal (24h) trends. An `aqi_diff` feature captures the hourly rate of change.
-
-A critical design decision here is snapshotting a copy of the DataFrame before adding the prediction target. The target column (`next hour's AQI`) is created by shifting `aqi_index` forward by one step, which causes the final row to become NaN and get dropped. That final row — the most recent real reading — is exactly what the forecast needs as its starting point. Snapshotting before the shift preserves it.
-
-The train/test split is strictly time-ordered: the first 80% of records train the model, the last 20% evaluate it. No shuffling occurs so future data never leaks into training.
+Loads all MongoDB records and engineers lag features (1h, 2h, 3h, 24h), rolling means (3h, 6h, 24h), and an `aqi_diff` change signal. The DataFrame is snapshotted before the prediction target is created (next hour's AQI via a forward shift) to preserve the most recent row as the forecast seed. Train/test split is strictly time-ordered (80/20) — no shuffling.
 
 ### 72-Hour Autoregressive Forecast
-
-The forecast function predicts the next hour's AQI, then feeds that prediction back as input for the following hour, rolling forward 72 times. At each step it updates all lag and rolling features using the growing list of predicted values. The `aqi_lag24` feature is handled with special care: for the first 24 steps, the real feature-engineered value from the seed row is carried forward (no predicted history exists yet); from step 24 onward, the prediction from 24 steps back is used instead.
-
-The 72 hourly predictions are grouped into three blocks of 24 and averaged to produce a single daily AQI estimate for each of the three forecast days.
+Predicts the next hour's AQI, feeds that prediction back as input, and rolls forward 72 steps — updating all lag and rolling features at each step. `aqi_lag24` uses real seed values for the first 24 steps, then switches to predictions. The 72 hourly values are grouped into three 24-hour blocks and averaged for the daily forecast cards.
 
 ### Dashboard (`aqi_dashboard.py`)
-
-The dashboard connects to MongoDB using the respective URI, then runs the full pipeline when the user clicks Train & Forecast. It displays a real-time AQI gauge for the current reading, a 7-day historical trend chart, a 72-hour forecast line chart with AQI band shading, three day-forecast cards with colour-coded severity, a five-model benchmark comparison, an actual-vs-predicted chart on the test set, and a SHAP feature importance chart. A tiered alert system evaluates both current and forecasted AQI and surfaces contextual warnings.
+Displays: a real-time AQI gauge, 7-day historical trend, 72-hour forecast chart with AQI band shading, three day-forecast cards, a five-model benchmark table, actual-vs-predicted chart, and SHAP feature importance. A tiered alert system evaluates both current and forecasted AQI.
 
 ---
 
 ## Models & Evaluation
 
-Five models are trained and benchmarked on every pipeline run. The winner is automatically selected by R² score.
+Five models are trained and benchmarked on every run. The best R² score wins automatically.
 
-### Models
-1. Linear Regression 
+1. Linear Regression
 2. Ridge Regression
 3. Random Forest
 4. XGBoost
-5. LightGBM 
+5. LightGBM
 
-Models are evaluated on MAE (average AQI units off), RMSE (penalises large errors), and R² (overall fit quality, used for selection).
+Evaluation metrics: **MAE** (average units off), **RMSE** (penalises large errors), **R²** (overall fit, used for selection).
 
 ---
 
 ## SHAP Explainability
 
-After training, SHAP values are computed on the test set to explain what the best model learned. The appropriate explainer is selected automatically — TreeExplainer for XGBoost, LightGBM, and Random Forest; LinearExplainer for Ridge and Linear Regression.
-
-The dashboard shows mean absolute SHAP values per feature, indicating how much each feature consistently moves predictions up or down. Lag features (`aqi_lag1`, `aqi_lag2`) typically dominate, confirming that recent AQI history is the strongest short-term signal. Weather features like wind speed and humidity show secondary importance, reflecting their role in pollution dispersion. A top-3 driver callout highlights the most influential features for the winning model on that run.
+SHAP values are computed on the test set after training. TreeExplainer is used for XGBoost, LightGBM, and Random Forest; LinearExplainer for Ridge and Linear Regression. Lag features (`aqi_lag1`, `aqi_lag2`) typically dominate. Wind speed and humidity show secondary importance. A top-3 driver callout highlights the most influential features for that run.
 
 ---
 
 ## Alerts System
-
-The dashboard evaluates both the current AQI reading and each of the three forecasted days against four thresholds:
 
 | Level | AQI Range | Recommendation |
 |---|---|---|
@@ -131,42 +100,40 @@ The dashboard evaluates both the current AQI reading and each of the three forec
 | 🔴 Very Unhealthy | 201 – 300 | Sensitive groups should remain indoors |
 | 🚨 Hazardous | 301 – 500 | Avoid all outdoor exposure |
 
-Forecast alerts give Matiari residents up to 72 hours of advance warning to adjust outdoor schedules, school activity, or agricultural work before hazardous conditions arrive.
+Alerts cover both current readings and all three forecast days, giving residents up to 72 hours of advance warning.
 
 ---
 
 ## CI/CD Automation
 
-Two GitHub Actions workflows run on schedule using repository secrets for credentials.
+Two GitHub Actions workflows run on schedule using repository secrets.
 
-The **hourly workflow** triggers `hourly_fetch.py` at the top of every hour. It installs dependencies, runs the fetch script, and inserts the new record into MongoDB. The only secrets required are the MongoDB URI and the OpenWeatherMap API key.
-
-The **daily workflow** triggers `train_models.py` every morning at 2 AM UTC. It retrains all five models on the latest accumulated dataset and overwrites the saved model artifact and forecast CSV. This ensures the dashboard always serves predictions from a model trained on the most recent data.
+- **Hourly workflow** — triggers `hourly_fetch.py` at the top of every hour; inserts new records into MongoDB.
+- **Daily workflow** — triggers `train_models.py` at 2 AM UTC; retrains all five models and overwrites the saved model artifact and forecast CSV.
 
 ---
 
 ## Challenges & Resolutions
 
-### 1. Hopsworks Integration Issues
-Faced connectivity and setup problems with Hopsworks, so the project was migrated to MongoDB Atlas for easier cloud storage, scalability, and smoother real-time data handling.
+| Challenge | Resolution |
+|---|---|
+| Hopsworks connectivity issues | Migrated to MongoDB Atlas for easier cloud storage and real-time handling |
+| API missing/inconsistent data | Added error handling, retries, and data validation |
+| Managing multiple ML models | Built a modular training pipeline to automate preprocessing, training, and evaluation |
+| Streamlit import errors | Reorganised project into modular folders and reusable components |
+| Feature engineering complexity | Implemented time-based and lag features for better prediction accuracy |
+| Forecast instability | Regular retraining and rolling data windows improved reliability |
+| Serverless architecture | Optimised workflows and lightweight architecture solved scalability issues |
 
-### 2. API Reliability Problems
-External AQI and weather APIs sometimes returned missing or inconsistent data. This was solved using error handling, retries, and data validation techniques.
+---
 
-### 3. Model Training Complexity
-Managing multiple ML models and retraining pipelines was challenging. A modular training pipeline was created to automate preprocessing, training, and evaluation.
+## What I Learned
 
-### 4. Streamlit & Import Errors
-Issues like ModuleNotFoundError and poor project structure were resolved by reorganizing the project into modular folders and reusable components.
-
-### 5. Feature Engineering Challenges
-Converting raw AQI/weather data into useful features required extensive preprocessing, including time-based and lag features to improve prediction accuracy.
-
-### 6. Real-Time Prediction Stability
-AQI values fluctuate rapidly, affecting forecast consistency. Regular retraining and rolling historical data windows improved prediction reliability.
-
-### 7. Serverless Architecture Management
-Integrating cloud services and automation in a fully serverless environment was difficult initially, but optimized workflows and lightweight architecture solved scalability issues.
+- **GitHub Actions** — Built fully automated scheduled pipelines for hourly data collection and daily retraining, learning cron scheduling, secret management, and debugging from workflow logs.
+- **API Data Fetching** — Integrated multiple external APIs and handled real-world issues like missing fields, inconsistent responses, and rate limits through resilient error handling.
+- **Cloud Storage with MongoDB Atlas** — Designed time-series document schemas, queried records efficiently, and used a cloud database as the backbone of an ML pipeline rather than flat files.
+- **Autoregressive Forecasting** — Learned how prediction errors compound when fed back as inputs, and how to carefully manage lag features (like `aqi_lag24`) that lack predicted history in early forecast steps.
+- **SHAP Explainability** — Applied model-agnostic and model-specific explainers to understand feature importance, turning a black-box ensemble into interpretable, actionable insights.
 
 ---
 
