@@ -1,5 +1,5 @@
-import os
 import io
+import os
 import numpy as np
 import pandas as pd
 from pymongo import MongoClient
@@ -13,7 +13,7 @@ import joblib
 from math import sqrt
 from bson.binary import Binary
 
-# CONNECT 
+# CONNECT
 MONGODB_URI = os.getenv("MONGODB_URI")
 client = MongoClient(MONGODB_URI)
 db = client["aqi_db"]
@@ -23,7 +23,7 @@ models_col    = db["ml_models"]
 forecasts_col = db["aqi_forecasts"]
 metadata_col  = db["model_metadata"]
 
-# LOAD DATA 
+# LOAD DATA
 df = pd.DataFrame(list(collection.find()))
 if "_id" in df.columns:
     df.drop(columns=["_id"], inplace=True)
@@ -43,7 +43,9 @@ df["aqi_roll_6"]  = df["aqi_index"].rolling(6).mean()
 df["aqi_roll_24"] = df["aqi_index"].rolling(24).mean()
 df = df.dropna()
 
-df_latest = df.copy()   # forecast seed — snapshot before target shift
+# ✅ FIXED: snapshot AFTER feature engineering, BEFORE target shift
+# This ensures the forecast seed matches exactly what Streamlit builds
+df_latest = df.copy()
 
 df["target"] = df["aqi_index"].shift(-1)
 df = df.dropna()
@@ -73,7 +75,7 @@ models = {
 
 results = {}
 
-# TRAIN + EVALUATE + SAVE ALL MODELS 
+# TRAIN + EVALUATE + SAVE ALL MODELS
 print("\nTraining and saving all models...\n")
 
 for name, model in models.items():
@@ -110,7 +112,7 @@ for name, model in models.items():
     )
     print(f"'{name}' saved to MongoDB\n")
 
-# MARK BEST MODE
+# MARK BEST MODEL
 best_name  = max(results, key=lambda x: results[x][3])
 best_model = results[best_name][0]
 
@@ -125,11 +127,11 @@ def forecast_72_hours(model, df, features):
     predictions = []
 
     for i in range(72):
-        latest  = df_copy.iloc[-1] # last row from the dataset
+        latest  = df_copy.iloc[-1]
         pred    = model.predict(pd.DataFrame([latest[features]]))[0]
         predictions.append(pred)
 
-        new_row = latest.copy() # cuz model needs data for the next prediction
+        new_row = latest.copy()
         new_row["aqi_index"]   = pred
         new_row["aqi_lag3"]    = latest["aqi_lag2"]
         new_row["aqi_lag2"]    = latest["aqi_lag1"]
@@ -149,7 +151,7 @@ def forecast_72_hours(model, df, features):
 
 future_72h = forecast_72_hours(best_model, df_latest, features)
 
-# SAVE FORECASTS 
+# SAVE FORECASTS
 base_dt = df_latest["datetime"].iloc[-1]
 
 hourly_docs = [
@@ -163,8 +165,8 @@ hourly_docs = [
     for i in range(72)
 ]
 
-forecasts_col.delete_many({"model_name": best_name}) # removing previous forecasts
-forecasts_col.insert_many(hourly_docs) # adding new forecasts
+forecasts_col.delete_many({"model_name": best_name})
+forecasts_col.insert_many(hourly_docs)
 print("72-hour hourly forecast saved to MongoDB")
 
 daily_docs = []
