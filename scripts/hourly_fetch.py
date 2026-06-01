@@ -71,6 +71,21 @@ pollutants = {
 }
 
 # CUSTOM AQI COMPUTATION
+# def compute_aqi(p):
+#     values = [
+#         p.get("pm25"),
+#         p.get("pm10"),
+#         p.get("no2"),
+#         p.get("o3"),
+#         p.get("co"),
+#         p.get("so2"),
+#     ]
+
+#     values = [v for v in values if v is not None]
+
+#     return max(values) if values else None
+
+# AQI INDEX FUNCTION
 def compute_aqi(p):
     values = [
         p.get("pm25"),
@@ -80,10 +95,8 @@ def compute_aqi(p):
         p.get("co"),
         p.get("so2"),
     ]
-
     values = [v for v in values if v is not None]
-
-    return max(values) if values else None
+    return sum(values) / len(values) if values else None
 
 # CURRENT COMPUTED AQI
 current_aqi = compute_aqi(pollutants)

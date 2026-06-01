@@ -147,7 +147,6 @@ def load_weather_data(uri: str) -> pd.DataFrame:
 
 
 @st.cache_resource(show_spinner=False)
-@st.cache_resource(show_spinner=False)
 def load_all_models_from_mongo(uri: str):
     client = MongoClient(uri)
     collection = client["aqi_db"]["ml_models"]
@@ -163,8 +162,7 @@ def load_all_models_from_mongo(uri: str):
         best_doc = max(meta_docs, key=lambda d: d.get("r2", -999))
     best_name = best_doc["model_name"]
 
-    # Step 3: load each model binary individually — one find_one() per model
-    # This avoids holding a long-lived cursor over large documents
+    # Step 3: load each model binary individually — one find_one() per mode, this avoids holding a long-lived cursor over large documents
     models_dict = {}
     for meta in meta_docs:
         name = meta["model_name"]

@@ -66,7 +66,7 @@ The Streamlit app runs the full pipeline on user request — loading data, train
 ## Pipeline Details
 
 ### Hourly Feature Pipeline (`hourly_fetch.py`)
-Fetches weather (temperature, humidity, pressure, wind, cloud cover) and air pollution (PM2.5, PM10, NO₂, O₃, SO₂, CO) from OpenWeatherMap. AQI is computed as the max concentration across pollutants — a conservative worst-case signal. `aqi_change_rate` is derived by comparing against the previous MongoDB record. Time features (hour, day, month, etc.) are also stored for seasonality modelling.
+Fetches weather (temperature, humidity, pressure, wind, cloud cover) and air pollution (PM2.5, PM10, NO₂, O₃, SO₂, CO) from OpenWeatherMap. AQI is computed as the avearge of all the pollutants — a conservative worst-case signal. `aqi_change_rate` is derived by comparing against the previous MongoDB record. Time features (hour, day, month, etc.) are also stored for seasonality modelling.
 
 ### Historical Backfill (`historical_fetch.py`)
 A one-time script that seeded MongoDB with months of historical data using the Open-Meteo Archive and Air Quality APIs (free, no key required). Records are merged on matching timestamps and inserted into the same collection as live data, creating a unified dataset.
@@ -98,7 +98,7 @@ Evaluation metrics: **MAE** (average units off), **RMSE** (penalises large error
 
 ## SHAP Explainability
 
-SHAP values are computed on the test set after training. TreeExplainer is used for XGBoost, LightGBM, and Random Forest; LinearExplainer for Ridge and Linear Regression. Lag features (`aqi_lag1`, `aqi_lag2`) typically dominate. Wind speed and humidity show secondary importance. A top-3 driver callout highlights the most influential features for that run.
+SHAP values are computed on the test set after training. TreeExplainer is used for XGBoost, LightGBM, and Random Forest; LinearExplainer for Ridge and Linear Regression. `aqi_roll_3` & `aqi_lag2` typically dominate. `aqi_diff` & `aqi_roll_6` have secondary importance. A top-3 driver callout highlights the most influential features for that run.
 
 ---
 

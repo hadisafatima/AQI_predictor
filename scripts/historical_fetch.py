@@ -21,7 +21,7 @@ weather_url = (
     "https://archive-api.open-meteo.com/v1/archive"
     f"?latitude={LAT}&longitude={LON}"
     "&start_date=2026-03-01"
-    "&end_date=2026-05-18"
+    "&end_date=2026-05-31"
     "&hourly=temperature_2m,relative_humidity_2m,pressure_msl,"
     "wind_speed_10m,wind_direction_10m,cloud_cover"
     "&timezone=auto"
@@ -70,6 +70,19 @@ for i, dt in enumerate(aqi["time"]):
     }
 
 # AQI INDEX FUNCTION
+# def compute_aqi(p):
+#     values = [
+#         p.get("pm25"),
+#         p.get("pm10"),
+#         p.get("no2"),
+#         p.get("o3"),
+#         p.get("co"),
+#         p.get("so2"),
+#     ]
+#     values = [v for v in values if v is not None]
+#     return max(values) if values else None
+
+# AQI INDEX FUNCTION
 def compute_aqi(p):
     values = [
         p.get("pm25"),
@@ -80,7 +93,7 @@ def compute_aqi(p):
         p.get("so2"),
     ]
     values = [v for v in values if v is not None]
-    return max(values) if values else None
+    return sum(values) / len(values) if values else None
 
 # SORT TIME KEYS
 all_times = sorted(set(weather_map.keys()) & set(aqi_map.keys()))
