@@ -100,12 +100,12 @@ hr { border-color: var(--border) !important; }
 # AQI HELPERS
 def aqi_category(val):
     v = float(val)
-    if v <= 50:  return "Good",                "#3ecf8e"
-    if v <= 100: return "Moderate",            "#f5a623"
-    if v <= 150: return "Unhealthy (Sensitive)","#ff8c42"
-    if v <= 200: return "Unhealthy",           "#e84040"
-    if v <= 300: return "Very Unhealthy",      "#9b5de5"
-    return            "Hazardous",             "#c70039"
+    if v <= 50:  return "Good",                 "#3ecf8e"
+    if v <= 100: return "Moderate",             "#f5a623"
+    if v <= 150: return "Unhealthy (Sensitive)", "#ff8c42"
+    if v <= 200: return "Unhealthy",            "#e84040"
+    if v <= 300: return "Very Unhealthy",       "#9b5de5"
+    return             "Hazardous",             "#c70039"
 
 def aqi_gauge(val):
     cat, color = aqi_category(val)
@@ -136,7 +136,10 @@ def aqi_gauge(val):
 
 
 # MONGO HELPERS
-@st.cache_data(show_spinner=False)
+# ✅ FIX: ttl=3600 forces cache to expire every hour on the deployed instance
+#         so it always fetches fresh data from MongoDB instead of serving
+#         stale results from a previous session.
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_weather_data(uri: str) -> pd.DataFrame:
     client = MongoClient(uri)
     df = pd.DataFrame(list(client["aqi_db"]["weather_data"].find()))
@@ -146,7 +149,9 @@ def load_weather_data(uri: str) -> pd.DataFrame:
     return df.sort_values("datetime").reset_index(drop=True)
 
 
-@st.cache_resource(show_spinner=False)
+# ✅ FIX: ttl=3600 ensures models are reloaded every hour, picking up any
+#         newly retrained models instead of keeping the old binary in memory.
+@st.cache_resource(show_spinner=False, ttl=3600)
 def load_all_models_from_mongo(uri: str):
     client = MongoClient(uri)
     collection = client["aqi_db"]["ml_models"]
@@ -162,7 +167,8 @@ def load_all_models_from_mongo(uri: str):
         best_doc = max(meta_docs, key=lambda d: d.get("r2", -999))
     best_name = best_doc["model_name"]
 
-    # Step 3: load each model binary individually — one find_one() per mode, this avoids holding a long-lived cursor over large documents
+    # Step 3: load each model binary individually — one find_one() per model,
+    # this avoids holding a long-lived cursor over large documents
     models_dict = {}
     for meta in meta_docs:
         name = meta["model_name"]
@@ -174,7 +180,8 @@ def load_all_models_from_mongo(uri: str):
     return models_dict, best_name
 
 
-@st.cache_data(show_spinner=False)
+# ✅ FIX: ttl=3600 so metadata (MAE, RMSE, R²) reflects the latest training run.
+@st.cache_data(show_spinner=False, ttl=3600)
 def load_all_metadata(uri: str) -> dict:
     """
     Load metadata for all models.
@@ -192,6 +199,7 @@ FEATURES = [
     "aqi_roll_3", "aqi_roll_6", "aqi_roll_24", "aqi_diff",
 ]
 
+# FEATURE ENGINEERING
 def build_forecast_seed(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["aqi_diff"]    = df["aqi_index"].diff()
@@ -230,7 +238,7 @@ def forecast_72h(model, df_seed: pd.DataFrame) -> list:
     return predictions
 
 
-# SHAP 
+# SHAP
 def compute_shap(model, df_seed: pd.DataFrame, model_name: str):
     X_sample = df_seed[FEATURES].tail(200)
     try:
@@ -256,6 +264,7 @@ DARK_LAYOUT = dict(
     margin=dict(t=40, b=40, l=50, r=20),
 )
 
+# last 7 days' AQI plotting
 def plot_historical(df_raw):
     last = df_raw.tail(7 * 24)
     fig  = go.Figure()
@@ -267,6 +276,8 @@ def plot_historical(df_raw):
     fig.update_layout(**DARK_LAYOUT, title="Last 7 Days — Hourly AQI", height=280)
     return fig
 
+
+# 72 hours (3 days) forecasted AQI plotting
 def plot_forecast_line(predictions, base_dt):
     hours  = [base_dt + timedelta(hours=i + 1) for i in range(72)]
     colors = [aqi_category(v)[1] for v in predictions]
@@ -282,13 +293,14 @@ def plot_forecast_line(predictions, base_dt):
     fig.update_layout(**DARK_LAYOUT, title="72-Hour AQI Forecast", height=320)
     return fig
 
+
+# model comparison
 def plot_model_comparison(all_metadata: dict, best_name: str):
     names  = list(all_metadata.keys())
     maes   = [all_metadata[n].get("mae",  0) for n in names]
     rmses  = [all_metadata[n].get("rmse", 0) for n in names]
     r2s    = [all_metadata[n].get("r2",   0) for n in names]
 
-    # highlight best model in amber, others in muted blue
     bar_colors = ["#f5a623" if n == best_name else "#4fb3ff" for n in names]
 
     fig = make_subplots(
@@ -316,6 +328,8 @@ def plot_model_comparison(all_metadata: dict, best_name: str):
         fig.layout[ax].update(gridcolor="#2a2a30", linecolor="#2a2a30")
     return fig
 
+
+# Feature importance chart
 def plot_shap(shap_vals, X_sample):
     mean_abs = np.abs(shap_vals).mean(axis=0)
     feat_imp = pd.Series(mean_abs, index=X_sample.columns).sort_values()
@@ -332,7 +346,7 @@ def plot_shap(shap_vals, X_sample):
     return fig
 
 
-# SIDEBAR 
+# SIDEBAR
 with st.sidebar:
     st.markdown("""
     <div style='font-family:Syne,sans-serif;font-size:1.4rem;font-weight:800;
@@ -398,7 +412,7 @@ if not mongo_uri:
     st.stop()
 
 
-# STEP 1 · WEATHER DATA 
+# STEP 1 · WEATHER DATA
 with st.spinner("Fetching weather data from MongoDB…"):
     try:
         df_raw = load_weather_data(mongo_uri)
@@ -422,9 +436,9 @@ with st.spinner("Loading all 5 models from MongoDB…"):
         st.error(f"❌ Failed to load models: {e}")
         st.stop()
 
-best_meta    = all_metadata.get(best_name, {})
-best_model   = models_dict[best_name]
-trained_at   = best_meta.get("trained_at", "—")
+best_meta  = all_metadata.get(best_name, {})
+best_model = models_dict[best_name]
+trained_at = best_meta.get("trained_at", "—")
 
 st.info(f"🤖 **{len(models_dict)} models** loaded · "
         f"🏆 Best: **{best_name}** · trained on `{trained_at}`")
@@ -435,7 +449,7 @@ with st.spinner("Engineering features…"):
     df_seed = build_forecast_seed(df_raw)
 
 
-# STEP 4 · 72-HOUR FORECAST (best model) 
+# STEP 4 · 72-HOUR FORECAST (best model)
 with st.spinner(f"Running 72-hour forecast with {best_name}…"):
     preds_72 = forecast_72h(best_model, df_seed)
 
@@ -466,7 +480,7 @@ c4.metric("MAE",         f"{best_meta.get('mae', '—')}")
 c5.metric("RMSE",        f"{best_meta.get('rmse','—')}")
 
 
-# GAUGE + HISTORY 
+# GAUGE + HISTORY
 g_col, h_col = st.columns([1, 2])
 with g_col:
     st.plotly_chart(aqi_gauge(current_aqi), use_container_width=True)
@@ -513,7 +527,7 @@ if not alerts_triggered:
     </div>""", unsafe_allow_html=True)
 
 
-# 3-DAY FORECAST CARDS 
+# 3-DAY FORECAST CARDS
 st.markdown("<div class='sec-head'>3-Day AQI Forecast</div>", unsafe_allow_html=True)
 
 day_labels = [
@@ -540,16 +554,14 @@ st.plotly_chart(plot_forecast_line(preds_72, base_dt), use_container_width=True)
 st.markdown("<div class='sec-head'>Model Comparison</div>", unsafe_allow_html=True)
 
 if all_metadata:
-    # bar charts
     st.plotly_chart(plot_model_comparison(all_metadata, best_name), use_container_width=True)
 
-    # model cards — one per model
     card_cols = st.columns(len(all_metadata))
     for col, (name, meta) in zip(card_cols, all_metadata.items()):
-        is_best   = name == best_name
-        crown     = " 🏆" if is_best else ""
-        card_cls  = "model-card best" if is_best else "model-card"
-        name_color= "#f5a623" if is_best else "#e8e8ec"
+        is_best    = name == best_name
+        crown      = " 🏆" if is_best else ""
+        card_cls   = "model-card best" if is_best else "model-card"
+        name_color = "#f5a623" if is_best else "#e8e8ec"
         with col:
             st.markdown(f"""
             <div class='{card_cls}'>
@@ -562,7 +574,6 @@ if all_metadata:
                 <div class='model-card-val'>{meta.get('rmse','—')}</div>
             </div>""", unsafe_allow_html=True)
 
-    # detailed table
     with st.expander("📋 Full Metrics Table"):
         rows = []
         for name, meta in all_metadata.items():
@@ -588,7 +599,7 @@ with st.expander("🗄️ Raw Data Explorer (last 200 rows)"):
     st.dataframe(df_raw.tail(200), use_container_width=True)
 
 
-# FOOTER 
+# FOOTER
 st.markdown("""
 <hr style='margin-top:2rem'>
 <div style='text-align:center;font-size:.68rem;color:#6b6b7a;
