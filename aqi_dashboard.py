@@ -237,6 +237,48 @@ def forecast_72h(model, df_seed: pd.DataFrame) -> list:
         df_copy = pd.concat([df_copy, pd.DataFrame([new_row])], ignore_index=True)
     return predictions
 
+# ACTUAL VS PREDICTED AQI
+def plot_actual_vs_predicted(df_raw, model, features):
+    df = build_forecast_seed(df_raw).copy()
+
+    # create supervised dataset same way as training
+    df["target"] = df["aqi_index"].shift(-1)
+    df = df.dropna()
+
+    X = df[features]
+    y = df["target"]
+
+    split = int(len(df) * 0.8)
+    X_test = X.iloc[split:]
+    y_test = y.iloc[split:]
+
+    preds = model.predict(X_test)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        y=y_test.values,
+        mode="lines",
+        name="Actual AQI",
+        line=dict(color="#3ecf8e", width=2)
+    ))
+
+    fig.add_trace(go.Scatter(
+        y=preds,
+        mode="lines",
+        name="Predicted AQI",
+        line=dict(color="#f5a623", width=2)
+    ))
+
+    fig.update_layout(
+        **DARK_LAYOUT,
+        title="Actual vs Predicted AQI (Test Set)",
+        height=350,
+        xaxis_title="Time Step",
+        yaxis_title="AQI"
+    )
+
+    return fig
 
 # SHAP
 def compute_shap(model, df_seed: pd.DataFrame, model_name: str):
@@ -574,18 +616,15 @@ if all_metadata:
                 <div class='model-card-val'>{meta.get('rmse','—')}</div>
             </div>""", unsafe_allow_html=True)
 
-    with st.expander("📋 Full Metrics Table"):
-        rows = []
-        for name, meta in all_metadata.items():
-            rows.append({
-                "Model": name,
-                "MAE":   meta.get("mae",  "—"),
-                "RMSE":  meta.get("rmse", "—"),
-                "R²":    meta.get("r2",   "—"),
-                "Best":  "🏆" if name == best_name else "",
-            })
-        st.dataframe(pd.DataFrame(rows).set_index("Model"), use_container_width=True)
 
+st.markdown("<br>", unsafe_allow_html=True)
+# ACTUAL VS PREDICTED
+st.markdown("<div class='sec-head'>Actual vs Predicted AQI</div>", unsafe_allow_html=True)
+
+st.plotly_chart(
+    plot_actual_vs_predicted(df_raw, best_model, FEATURES),
+    use_container_width=True
+)
 
 # SHAP FEATURE IMPORTANCE
 st.markdown("<div class='sec-head'>SHAP Feature Importance</div>", unsafe_allow_html=True)
