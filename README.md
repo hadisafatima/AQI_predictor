@@ -130,11 +130,10 @@ Two GitHub Actions workflows run on schedule using repository secrets.
 |---|---|
 | Hopsworks connectivity issues | Migrated to MongoDB Atlas for easier cloud storage and real-time handling |
 | API missing/inconsistent data | Added error handling, retries, and data validation |
-| Managing multiple ML models | Built a modular training pipeline to automate preprocessing, training, and evaluation |
+| Loading models | Implemented Streamlit's @st.cache_resource mechanism to keep models in memory and avoid repeated downloads from MongoDB.
 | Streamlit import errors | Reorganised project into modular folders and reusable components |
 | Feature engineering complexity | Implemented time-based and lag features for better prediction accuracy |
-| Forecast instability | Regular retraining and rolling data windows improved reliability |
-| Serverless architecture | Optimised workflows and lightweight architecture solved scalability issues |
+| Forecast Future AQI | Implemented recursive forecasting, where each predicted AQI value becomes an input for predicting subsequent hours, enabling 72-hour forecasting. |
 
 ---
 
