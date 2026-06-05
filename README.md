@@ -144,6 +144,7 @@ Two GitHub Actions workflows run on schedule using repository secrets.
 - **Cloud Storage with MongoDB Atlas** — Used MongoDB as both a feature store (time-series weather/AQI records) and a model store (serialised trained models). This eliminated local file dependencies entirely, making the pipeline fully cloud-native.
 - **Autoregressive Forecasting** — Learned how prediction errors compound when fed back as inputs, and how to carefully manage lag features (like `aqi_lag24`) that lack predicted history in early forecast steps.
 - **SHAP Explainability** — Applied model-agnostic and model-specific explainers to understand feature importance, turning a black-box ensemble into interpretable, actionable insights.
+- **End-to-End ML System Design** - Learned how to build, deploy, monitor, and maintain a complete machine learning pipeline. Gained practical experience in combining data engineering, ML, cloud storage, and visualization into a production-ready solution.
 
 ---
 
